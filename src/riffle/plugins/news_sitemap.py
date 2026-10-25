@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime, time, timezone
 from typing import Any
 from xml.etree import ElementTree
+from xml.parsers import expat
 
 from riffle.models import ChangeInput, Source, TimeWindow
 from riffle.network import MAX_ENTRIES, PublicFetcher, PublicFetchError, validate_public_url, validate_source_config
@@ -51,13 +52,20 @@ def _parse_time(value: str) -> datetime | None:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
+def _refuse(*_args: object) -> None:
+    raise PublicFetchError("Sitemap declares a document type")
+
+
 def _root(content: bytes) -> ElementTree.Element:
-    # Sitemaps never declare a document type. Refusing one keeps entity expansion out of the parser.
-    if b"<!DOCTYPE" in content[:4096].upper() or b"<!ENTITY" in content.upper():
-        raise PublicFetchError("Sitemap declares a document type")
+    # Sitemaps never declare a document type. A first pass refuses any declaration in any encoding, before ElementTree
+    # reads the document, so that no entity is ever expanded. A byte search would miss UTF-16 documents.
+    scanner = expat.ParserCreate()
+    scanner.StartDoctypeDeclHandler = _refuse
+    scanner.EntityDeclHandler = _refuse
     try:
+        scanner.Parse(content, True)
         return ElementTree.fromstring(content)
-    except ElementTree.ParseError:
+    except (expat.ExpatError, ElementTree.ParseError):
         raise PublicFetchError("Sitemap could not be parsed") from None
 
 
@@ -145,7 +153,10 @@ class NewsSitemapPlugin:
         if not children and not entries and root.tag != f"{SITEMAP}urlset":
             raise PublicFetchError("Source is not a sitemap")
         for child in children[:MAX_CHILD_SITEMAPS]:
-            page = news_entries(_root(client.get(str(validate_public_url(child, base_url=response.url))).content))
+            child_root = _root(client.get(str(validate_public_url(child, base_url=response.url))).content)
+            if child_root.tag != f"{SITEMAP}urlset":
+                raise PublicFetchError("Sitemap index lists a document that is not a sitemap")
+            page = news_entries(child_root)
             entries.extend(page)
             # Pages run from new to old by last change, so one page can hold an old story that was updated.
             # Only a page whose newest story is older than the window means the next pages are older still.

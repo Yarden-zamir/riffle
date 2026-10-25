@@ -114,6 +114,8 @@ def test_index_reads_children_until_a_page_is_older_than_the_window(wire: Wire) 
 
 @pytest.mark.parametrize("body", [
     b"<?xml version='1.0'?><!DOCTYPE urlset [<!ENTITY a 'aaaa'>]><urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'/>",
+    # UTF-16 hides the declaration from a byte search.
+    "<?xml version='1.0' encoding='UTF-16'?><!DOCTYPE urlset [<!ENTITY a 'aaaa'>]><urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'>&a;</urlset>".encode("utf-16"),
     b"<rss version='2.0'><channel><title>Feed</title></channel></rss>",
     b"<html><title>Page</title>",
 ])
@@ -121,6 +123,13 @@ def test_documents_that_are_not_plain_sitemaps_fail(wire: Wire, body: bytes) -> 
     wire.responses.append(response(body))
     with pytest.raises(PublicFetchError):
         NewsSitemapPlugin().fetch(source(), WINDOW)
+
+
+def test_index_child_that_is_not_a_sitemap_fails(wire: Wire) -> None:
+    wire.responses.extend([response(index("/news.xml?page=1", "/news.xml?page=2")),
+                           response(b"<rss version='2.0'><channel><title>Feed</title></channel></rss>")])
+    with pytest.raises(PublicFetchError, match="not a sitemap"):
+        NewsSitemapPlugin().fetch(source(url="http://news.example/index.xml"), WINDOW)
 
 
 def test_empty_urlset_is_a_valid_empty_source(wire: Wire) -> None:

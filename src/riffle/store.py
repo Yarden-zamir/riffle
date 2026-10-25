@@ -405,7 +405,10 @@ def delete_source(source_id: int, db_path: Path | None = None, *, owner_id: str 
 
 
 def _fallback_external_id(source_id: int, change: ChangeInput) -> str:
-    parts = [str(source_id), change.url or "", change.title, change.published_at.astimezone(timezone.utc).isoformat()]
+    parts = [str(source_id), change.url or "", change.title]
+    # An undated change carries its fetch time, which differs on each fetch. It would make a new card each time.
+    if change.metadata.get("undated") is not True:
+        parts.append(change.published_at.astimezone(timezone.utc).isoformat())
     return hashlib.sha256("\0".join(parts).encode("utf-8")).hexdigest()
 
 

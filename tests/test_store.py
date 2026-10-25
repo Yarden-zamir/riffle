@@ -143,3 +143,14 @@ def test_undated_changes_keep_their_first_fetch_time(tmp_path) -> None:
 
     times = {change.external_id: change.published_at for change in list_changes(db_path=db_path)}
     assert times == {"undated": first, "dated": later}
+
+
+def test_undated_changes_without_ids_keep_one_card(tmp_path) -> None:
+    db_path = tmp_path / "riffle.duckdb"
+    source = add_source(SourceCreate(name="Feed", config={"url": "https://example.com/feed.xml"}), db_path)
+    first, later = datetime(2026, 10, 20, 10, tzinfo=timezone.utc), datetime(2026, 10, 21, 10, tzinfo=timezone.utc)
+
+    for at in (first, later):
+        upsert_changes(source.id, [ChangeInput(title="No id, no link, no date", published_at=at, metadata={"undated": True})], db_path)
+
+    assert [change.published_at for change in list_changes(db_path=db_path)] == [first]
