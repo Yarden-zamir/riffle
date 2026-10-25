@@ -210,7 +210,7 @@ def test_enrichment_compacts_rich_content_when_summary_is_empty() -> None:
     )
 
     assert enriched.summary == "Welcome to the update.\n- New cosmetics are available."
-    assert enriched.content == ""
+    assert enriched.content == "<p>Welcome to the update.</p><ul><li>New cosmetics are available.</li></ul>"
 
 
 def test_enrichment_compacts_version_only_categorized_release_notes() -> None:

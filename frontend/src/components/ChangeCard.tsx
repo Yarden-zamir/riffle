@@ -1,5 +1,5 @@
 import { BookmarkCheck, BookmarkPlus, CalendarDays, Check, ChevronDown, ExternalLink, Undo2, X, type LucideIcon } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { formatDate, openChange, renderedHtml, safeUrl, type CardLocation, type ViewChange } from "../lib/changes";
 import { leaveDurationMs, useSwipe, type SwipeDirection } from "../lib/swipe";
@@ -44,6 +44,8 @@ export function ChangeCard({ change, location, focused, pending, noteDraft, note
   const noteId = `note-${change.id}`;
   const onShelf = location === "shelf";
   const url = safeUrl(change.url);
+  const imageUrl = typeof change.metadata?.image_url === "string" ? safeUrl(change.metadata.image_url) : null;
+  const [imageFailed, setImageFailed] = useState(false);
   const slot = useRef<HTMLDivElement>(null);
   const collapse = useRef<Animation | null>(null);
   const mounted = useRef(true);
@@ -100,6 +102,18 @@ export function ChangeCard({ change, location, focused, pending, noteDraft, note
 
       <div className="grid gap-0 md:grid-cols-[minmax(0,1fr)_210px]">
         <div className="min-w-0 p-3 sm:p-5">
+          {imageUrl && !imageFailed ? (
+            // The first image of the post. It is decorative: the title next to it names the post.
+            <img
+              alt=""
+              className="mb-4 h-48 w-full rounded border-2 border-line bg-raised object-cover object-top sm:h-64"
+              decoding="async"
+              loading="lazy"
+              onError={() => setImageFailed(true)}
+              referrerPolicy="no-referrer"
+              src={imageUrl}
+            />
+          ) : null}
           <div className="flex flex-wrap items-center gap-2 text-xs font-extrabold uppercase tracking-[0.06em] text-muted">
             <button
               className="sticker cursor-pointer bg-info text-[0.7rem]"
@@ -131,7 +145,7 @@ export function ChangeCard({ change, location, focused, pending, noteDraft, note
           ) : null}
 
           {preview.trim() ? (
-            <div className="scrollbar-none mt-3 max-h-72 touch-pan-y overflow-y-auto rounded border-2 border-line bg-raised px-2 py-2 sm:mt-4 sm:px-4 sm:py-3">
+            <div className="scrollbar-none mt-3 max-h-[30rem] touch-pan-y overflow-y-auto rounded border-2 border-line bg-raised px-2 py-2 sm:mt-4 sm:px-4 sm:py-3">
               <RenderedText value={preview} />
             </div>
           ) : (

@@ -261,6 +261,10 @@ Behavior:
 - Version-only titles such as `v0.115.1` are replaced with the first meaningful non-header release-note line when available.
 - Thin or generic summaries such as `Learn what's new...` can trigger linked-page fetching for profiles that allow it.
 - Overloaded release bodies are compacted to the first meaningful bullets or paragraphs.
+- The card `content` of an entry with an HTML body is an excerpt of that body. It keeps headings, lists, bold, links, code and tables. It drops images, scripts and `<details>` blocks.
+- The excerpt shows about 1,500 characters of text. It cuts between whole blocks or whole list items, and it ends with `…` after a cut.
+- A body from a fetched linked page gets no excerpt. Its card shows the compacted summary.
+- `metadata.image_url` holds the first image of the entry body that suits a card picture. Icons, badges, emoji and SVG files do not count. A signed GitHub attachment link becomes its lasting `github.com/user-attachments/assets/<id>` address, because the signed link expires after 300 seconds.
 - Common boilerplate such as changelog compare links, release dates, download lists, social links, and feed footer text is dropped when detected.
 
 ## CLI Behavior

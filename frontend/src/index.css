@@ -254,6 +254,36 @@ body:has(dialog[open]) { overflow: hidden; }
   list-style: disc;
 }
 
+.riffle-rendered h1,
+.riffle-rendered h2,
+.riffle-rendered h3,
+.riffle-rendered h4,
+.riffle-rendered h5,
+.riffle-rendered h6 {
+  margin: 1rem 0 0.35rem;
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+}
+
+.riffle-rendered h1,
+.riffle-rendered h2 { font-size: 1.2rem; }
+.riffle-rendered h3 { font-size: 1.05rem; }
+.riffle-rendered h4,
+.riffle-rendered h5,
+.riffle-rendered h6 { font-size: 0.95rem; }
+
+.riffle-rendered strong,
+.riffle-rendered b { font-weight: 800; }
+
+/* Release notes put a paragraph in each list item. The item spacing replaces the paragraph margin. */
+.riffle-rendered li > p { margin: 0; }
+.riffle-rendered li + li { margin-top: 0.4rem; }
+
+.riffle-rendered table { border-collapse: collapse; margin: 0.65rem 0; }
+.riffle-rendered th,
+.riffle-rendered td { border: 2px solid var(--border); padding: 0.25rem 0.5rem; text-align: left; }
+
 .riffle-rendered ol {
   list-style: decimal;
 }
