@@ -265,6 +265,7 @@ Behavior:
 - The excerpt shows about 1,500 characters of text. It cuts between whole blocks or whole list items, and it ends with `…` after a cut.
 - A body from a fetched linked page gets no excerpt. Its card shows the compacted summary.
 - `metadata.image_urls` holds the images of the entry body that suit card pictures, in post order, without repeats, and at most 12. Icons, badges, emoji and SVG files do not count. A signed GitHub attachment link becomes its lasting `github.com/user-attachments/assets/<id>` address, because the signed link expires after 300 seconds.
+- A card shows these images in a row that scrolls sideways. A click on an image opens a full-screen viewer: zoom with buttons, the mouse wheel, a pinch or a double click, drag to pan, and move between images with the arrow buttons or keys. The viewer links to the original image.
 - Common boilerplate such as changelog compare links, release dates, download lists, social links, and feed footer text is dropped when detected.
 
 ## CLI Behavior

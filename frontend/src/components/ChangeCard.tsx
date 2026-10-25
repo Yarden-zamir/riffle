@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { formatDate, openChange, renderedHtml, safeUrl, type CardLocation, type ViewChange } from "../lib/changes";
 import { leaveDurationMs, useSwipe, type SwipeDirection } from "../lib/swipe";
+import { ImageViewer } from "./ImageViewer";
 import { Button } from "./ui/button";
 
 type SwipeAction = {
@@ -49,6 +50,7 @@ export function ChangeCard({ change, location, focused, pending, noteDraft, note
     : [];
   const [failedImages, setFailedImages] = useState<ReadonlySet<string>>(new Set());
   const shownImages = images.filter((image) => !failedImages.has(image));
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const slot = useRef<HTMLDivElement>(null);
   const collapse = useRef<Animation | null>(null);
   const mounted = useRef(true);
@@ -145,20 +147,28 @@ export function ChangeCard({ change, location, focused, pending, noteDraft, note
           {shownImages.length ? (
             // The images of the post, in post order. They are decorative: the title names the post.
             <div className="scrollbar-none mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain sm:mt-4" data-no-swipe={shownImages.length > 1 ? "" : undefined}>
-              {shownImages.map((image) => (
-                <img
-                  alt=""
-                  className={`h-48 shrink-0 snap-start rounded border-2 border-line bg-raised object-cover object-top sm:h-64 ${shownImages.length === 1 ? "w-full" : "w-[85%] sm:w-[70%]"}`}
-                  decoding="async"
+              {shownImages.map((image, index) => (
+                <button
+                  aria-label={`Enlarge image ${index + 1} of ${shownImages.length}`}
+                  className={`h-48 shrink-0 snap-start cursor-zoom-in overflow-hidden rounded border-2 border-line bg-raised sm:h-64 ${shownImages.length === 1 ? "w-full" : "w-[85%] sm:w-[70%]"}`}
                   key={image}
-                  loading="lazy"
-                  onError={() => setFailedImages((failed) => new Set(failed).add(image))}
-                  referrerPolicy="no-referrer"
-                  src={image}
-                />
+                  onClick={() => setViewerIndex(index)}
+                  type="button"
+                >
+                  <img
+                    alt=""
+                    className="h-full w-full object-cover object-top"
+                    decoding="async"
+                    loading="lazy"
+                    onError={() => setFailedImages((failed) => new Set(failed).add(image))}
+                    referrerPolicy="no-referrer"
+                    src={image}
+                  />
+                </button>
               ))}
             </div>
           ) : null}
+          <ImageViewer images={shownImages} index={viewerIndex} onIndexChange={setViewerIndex} />
         </div>
 
         <div className={`flex flex-col justify-end border-t-2 border-line p-3 sm:p-4 md:justify-start md:gap-4 md:border-l-2 md:border-t-0 ${onShelf ? "bg-warning-surface" : "bg-raised"}`}>
