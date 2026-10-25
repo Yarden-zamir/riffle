@@ -426,7 +426,8 @@ def upsert_changes(
                 SELECT id, ?, ?, ?, ?, ?, ?, ?, ? FROM sources WHERE id = ? AND owner_id = ?
                 ON CONFLICT (source_id, external_id) DO UPDATE SET
                     title = excluded.title, url = excluded.url, summary = excluded.summary,
-                    content = excluded.content, published_at = excluded.published_at,
+                    content = excluded.content,
+                    published_at = CASE WHEN ? THEN changes.published_at ELSE excluded.published_at END,
                     fetched_at = excluded.fetched_at, metadata = excluded.metadata
             """,
                 [
@@ -440,6 +441,8 @@ def upsert_changes(
                     _json(change.metadata),
                     source_id,
                     owner_id,
+                    # An undated change carries its fetch time. Keep the time of the first fetch, so the card does not move.
+                    change.metadata.get("undated") is True,
                 ],
             )
 

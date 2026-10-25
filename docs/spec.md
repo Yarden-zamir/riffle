@@ -72,7 +72,7 @@ Behavior:
 - DuckDB stores changes durably under their source owner. Equal source URLs do not create shared data across owners.
 - Changes dedupe by `(source_id, external_id)`.
 - If a plugin does not provide `external_id`, Riffle derives one from source ID, URL, title, and publication time.
-- A refresh updates known changes: title, URL, text, publication time, fetched time, and metadata.
+- A refresh updates known changes: title, URL, text, publication time, fetched time, and metadata. A change with `metadata.undated: true` keeps the publication time of its first fetch.
 - A refresh preserves `dismissed`, `saved`, `note`, and `state_updated_at`.
 - The backend owns this private state. Browser `localStorage` is not the state store.
 - Feed windows filter results. They do not expire or delete data.
@@ -153,7 +153,7 @@ Behavior:
 - Fetches public HTTP or HTTPS feeds under the network limits below.
 - Parses RSS and Atom entries.
 - Uses published, updated, or created timestamps when available.
-- Entries without timestamps are assigned the generation window end time.
+- Entries without timestamps are assigned the generation window end time and `metadata.undated: true`, so later refreshes keep the time of the first fetch.
 - Filters entries to the requested time window.
 - Applies `include_any` before `exclude_any` against title, URL, summary, and content.
 
@@ -183,6 +183,7 @@ Key: `html-news`
 - `article_path_prefix` selects article links and is required.
 - Optional `limit` accepts an integer from 1 to 100.
 - Article requests use the same network budget as the index request.
+- The publication time is the first visible `Month D, YYYY` date. A page without one gets the generation window end time and `metadata.undated: true`, so later refreshes keep the time of the first fetch.
 
 ### Built-In News Sitemap Plugin
 

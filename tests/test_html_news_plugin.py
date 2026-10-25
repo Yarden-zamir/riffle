@@ -29,7 +29,7 @@ def test_published_at_extracts_visible_arc_date() -> None:
     <p>Raiders!</p>
     """
 
-    published_at = _published_at(html, datetime(2026, 7, 8, tzinfo=timezone.utc))
+    published_at = _published_at(html)
 
     assert published_at == datetime(2026, 7, 7, tzinfo=timezone.utc)
 
@@ -41,3 +41,7 @@ def test_title_prefers_h1_and_removes_configured_suffix() -> None:
     """
 
     assert _title(html, [" | ARC Raiders"]) == "Live Update 1.36.0"
+
+
+def test_published_at_is_none_without_a_visible_date() -> None:
+    assert _published_at("<h1>Report</h1><p>Incident dates: Oct 3 2026</p>") is None

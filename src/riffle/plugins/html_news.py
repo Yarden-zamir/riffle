@@ -140,7 +140,8 @@ def _article_links(html: str, base_url: str, include_prefixes: list[str], exclud
     return links
 
 
-def _published_at(html: str, fallback: datetime) -> datetime:
+def _published_at(html: str) -> datetime | None:
+    """The first visible date in "Month D, YYYY" form. None when the page shows no such date."""
     parser = _PageParser()
     parser.feed(html)
     text = " ".join(" ".join(parser.visible_text).split())
@@ -158,7 +159,7 @@ def _published_at(html: str, fallback: datetime) -> datetime:
             return datetime(int(year), month, int(day), tzinfo=timezone.utc)
         except ValueError:
             continue
-    return fallback
+    return None
 
 
 def _title(html: str, suffixes: list[str]) -> str:
@@ -223,7 +224,9 @@ class HtmlNewsPlugin:
                     change.metadata["quality_flags"].append("article_budget_exhausted")
                 break
             html = article_response.text
-            published_at = _published_at(html, window.end)
+            # A page without a date gets the fetch time. The store keeps the first such time, so the card does not move.
+            dated = _published_at(html)
+            published_at = dated or window.end
             if published_at < window.start or published_at > window.end:
                 continue
             title = _title(html, title_suffixes)
@@ -241,6 +244,7 @@ class HtmlNewsPlugin:
                         "enrichment_profile": enrichment_profile.name,
                         "quality_flags": ["official_html_news"],
                         "raw_title": title,
+                        **({} if dated else {"undated": True}),
                     },
                 )
             )
