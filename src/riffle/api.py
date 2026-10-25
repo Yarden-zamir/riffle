@@ -37,6 +37,7 @@ from riffle.models import (
 )
 from riffle.network import (
     SOURCE_FETCH_SLOTS,
+    PublicFetcher,
     PublicFetchError,
     validate_source_config,
 )
@@ -50,6 +51,9 @@ from riffle.request_body import BodyLimitMiddleware
 from riffle.seed import DEFAULT_SOURCES, seed_default_sources
 from riffle.service import generate_changes
 from riffle.timeutils import parse_window
+
+# A GIF of a release note can hold many frames. Larger GIFs show without the scrubber.
+MAX_MEDIA_BYTES = 25 * 1024 * 1024
 
 CurrentIdentity = Annotated[Identity, Depends(request_identity)]
 # Imports copy browser data, so they need a browser, never an agent token.
@@ -465,6 +469,29 @@ def create_app() -> FastAPI:
     @app.post("/changes/restore", response_model=list[Change])
     def restore(body: RestoreRequest, identity: CurrentIdentity) -> list[Change]:
         return store.restore_changes(body.ids, identity.owner_id)
+
+    @app.get("/changes/{change_id}/media/{index}")
+    def change_media(change_id: int, index: int, identity: CurrentIdentity) -> Response:
+        """The bytes of one GIF of a card, from this site, so the browser can read its frames for the scrubber.
+
+        It serves only media that the card of this owner lists, so it is no open proxy. Image hosts such as
+        camo.githubusercontent.com send no CORS headers, so the browser cannot read their bytes directly.
+        """
+        change = store.get_change(change_id, owner_id=identity.owner_id)
+        media = change.metadata.get("media")
+        if not isinstance(media, list) or not 0 <= index < len(media) or not isinstance(media[index], dict):
+            raise HTTPException(404, "This card has no such media")
+        item = media[index]
+        if item.get("kind") != "gif" or not isinstance(item.get("url"), str):
+            raise HTTPException(404, "Only GIFs pass through this route")
+        try:
+            response = PublicFetcher().get(item["url"], max_bytes=MAX_MEDIA_BYTES)
+        # PublicFetchError and an invalid address both derive from ValueError.
+        except ValueError as exc:
+            raise HTTPException(502, "The image host did not return the GIF") from exc
+        if response.headers.get("content-type", "").split(";")[0].strip().lower() != "image/gif":
+            raise HTTPException(502, "The image host did not return a GIF")
+        return Response(response.content, media_type="image/gif", headers={"Cache-Control": "private, max-age=86400"})
 
     @app.patch("/changes/{change_id}", response_model=Change)
     def update_change(

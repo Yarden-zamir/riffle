@@ -1,8 +1,10 @@
-import { BookmarkCheck, BookmarkPlus, CalendarDays, Check, ChevronDown, ExternalLink, Undo2, X, type LucideIcon } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { BookmarkCheck, BookmarkPlus, CalendarDays, Check, ChevronDown, ExternalLink, Play, Undo2, X, type LucideIcon } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
-import { formatDate, openChange, renderedHtml, safeUrl, type CardLocation, type ViewChange } from "../lib/changes";
+import { api } from "../lib/api";
+import { cardMedia, formatDate, openChange, renderedHtml, safeUrl, type CardLocation, type CardMedia, type ViewChange } from "../lib/changes";
 import { leaveDurationMs, useSwipe, type SwipeDirection } from "../lib/swipe";
+import { MediaViewer } from "./MediaViewer";
 import { Button } from "./ui/button";
 
 type SwipeAction = {
@@ -16,6 +18,8 @@ type SwipeAction = {
 
 export type ChangeCardProps = {
   change: ViewChange;
+  /** The account that owns the card. The media route serves GIFs of this account only. */
+  owner: string;
   location: CardLocation;
   focused: boolean;
   pending: boolean;
@@ -39,11 +43,18 @@ function RenderedText({ value }: { value: string }) {
   return <div className="riffle-rendered text-[0.95rem] leading-7 text-ink" dangerouslySetInnerHTML={{ __html: renderedHtml(value) }} />;
 }
 
-export function ChangeCard({ change, location, focused, pending, noteDraft, noteOpen, onFocus, onClear, onToggleShelf, onSaveNote, onSourceFilter, onToggleNote, onUpdateDraft }: ChangeCardProps) {
+export function ChangeCard({ change, owner, location, focused, pending, noteDraft, noteOpen, onFocus, onClear, onToggleShelf, onSaveNote, onSourceFilter, onToggleNote, onUpdateDraft }: ChangeCardProps) {
   const preview = change.content || change.summary;
   const noteId = `note-${change.id}`;
   const onShelf = location === "shelf";
   const url = safeUrl(change.url);
+  const [failedMedia, setFailedMedia] = useState<ReadonlySet<string>>(new Set());
+  const shownMedia = cardMedia(change).filter((item) => !failedMedia.has(item.url));
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
+  const loadGif = useCallback(
+    (item: CardMedia) => api<Blob>(`/changes/${change.id}/media/${item.index}`, { owner, as: "blob" }),
+    [change.id, owner],
+  );
   const slot = useRef<HTMLDivElement>(null);
   const collapse = useRef<Animation | null>(null);
   const mounted = useRef(true);
@@ -131,12 +142,45 @@ export function ChangeCard({ change, location, focused, pending, noteDraft, note
           ) : null}
 
           {preview.trim() ? (
-            <div className="scrollbar-none mt-3 max-h-72 touch-pan-y overflow-y-auto rounded border-2 border-line bg-raised px-2 py-2 sm:mt-4 sm:px-4 sm:py-3">
+            <div className="scrollbar-none mt-3 max-h-[30rem] touch-pan-y overflow-y-auto rounded border-2 border-line bg-raised px-2 py-2 sm:mt-4 sm:px-4 sm:py-3">
               <RenderedText value={preview} />
             </div>
           ) : (
             <div className="mt-4 rounded border-2 border-dashed border-line bg-raised px-4 py-3 text-sm font-medium text-muted">No preview text came back for this source.</div>
           )}
+          {shownMedia.length ? (
+            // The images, GIFs and videos of the post, in post order. They are decorative: the title names the post.
+            <div className="scrollbar-none mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain sm:mt-4" data-no-swipe={shownMedia.length > 1 ? "" : undefined}>
+              {shownMedia.map((item, position) => (
+                <button
+                  aria-label={`Enlarge ${item.kind === "video" ? "video" : "image"} ${position + 1} of ${shownMedia.length}`}
+                  className={`relative h-48 shrink-0 snap-start cursor-zoom-in overflow-hidden rounded border-2 border-line bg-raised sm:h-64 ${shownMedia.length === 1 ? "w-full" : "w-[85%] sm:w-[70%]"}`}
+                  key={item.url}
+                  onClick={() => setViewerIndex(position)}
+                  type="button"
+                >
+                  {item.kind === "video" ? (
+                    <>
+                      <video className="h-full w-full object-cover object-top" muted onError={() => setFailedMedia((failed) => new Set(failed).add(item.url))} playsInline preload="metadata" src={item.url} />
+                      <span className="absolute inset-0 m-auto grid h-14 w-14 place-items-center rounded-full border-2 border-line bg-surface text-ink shadow-hard-sm"><Play className="h-6 w-6" /></span>
+                    </>
+                  ) : (
+                    <img
+                      alt=""
+                      className="h-full w-full object-cover object-top"
+                      decoding="async"
+                      loading="lazy"
+                      onError={() => setFailedMedia((failed) => new Set(failed).add(item.url))}
+                      referrerPolicy="no-referrer"
+                      src={item.url}
+                    />
+                  )}
+                  {item.kind === "gif" ? <span className="sticker absolute bottom-2 left-2 bg-yellow text-[0.65rem]">GIF</span> : null}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <MediaViewer index={viewerIndex} loadGif={loadGif} media={shownMedia} onIndexChange={setViewerIndex} />
         </div>
 
         <div className={`flex flex-col justify-end border-t-2 border-line p-3 sm:p-4 md:justify-start md:gap-4 md:border-l-2 md:border-t-0 ${onShelf ? "bg-warning-surface" : "bg-raised"}`}>

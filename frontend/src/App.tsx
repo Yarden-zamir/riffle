@@ -706,6 +706,7 @@ function Feed({ owner, profiles, revision, onEdit }: { owner: string; profiles: 
 
   const cardProps = (change: ViewChange, location: CardLocation) => ({
     change,
+    owner,
     pending: mutationLock.current || writes.current.some((job) => job.change.id === change.id) || needsReload.current,
     location,
     focused: focusedKey === change.change_key,

@@ -38,7 +38,8 @@ const nudgeDurationMs = 160;
 // Controls that own their own pointer interaction never start a swipe. Everything else on the card does,
 // links and preview text included: a click or tap still works because a swipe only arms after movement.
 // Known limit: a horizontal mouse drag over preview text swipes instead of selecting. Vertical selection still works.
-const controlSelector = "button, textarea, input, select";
+// `data-no-swipe` marks a region that scrolls sideways itself, such as the picture row of a card.
+const controlSelector = "button, textarea, input, select, [data-no-swipe]";
 
 // Once a swipe is armed the page must not scroll under the card. React registers touch listeners as passive,
 // so this native non-passive listener is the only way to cancel the browser pan.

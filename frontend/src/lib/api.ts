@@ -58,7 +58,8 @@ export async function resetSession(): Promise<void> {
   }
 }
 
-export async function api<T>(path: string, options: { owner: string | null; method?: "GET" | "POST" | "PATCH" | "DELETE"; body?: unknown; signal?: AbortSignal }): Promise<T> {
+/** `as: "blob"` reads the body as bytes, for media. Every other request reads JSON. */
+export async function api<T>(path: string, options: { owner: string | null; method?: "GET" | "POST" | "PATCH" | "DELETE"; body?: unknown; signal?: AbortSignal; as?: "json" | "blob" }): Promise<T> {
   const method = options.method ?? "GET";
   if (!options.owner && (path !== "/me" || method !== "GET")) {
     throw new ApiError("Account access is not ready. Reload before you retry.");
@@ -72,7 +73,7 @@ export async function api<T>(path: string, options: { owner: string | null; meth
     }
     throw new ApiError("Your account changed. Reload before you retry. No request was sent.", 412);
   }
-  const headers: Record<string, string> = { "X-Anonymous-Token": token, Accept: "application/json" };
+  const headers: Record<string, string> = { "X-Anonymous-Token": token, Accept: options.as === "blob" ? "*/*" : "application/json" };
   const cacheable = method === "GET" && Boolean(options.owner) && ["/changes", "/profiles", "/sources", "/plugins", "/catalog"].includes(path.split("?")[0]);
   const cacheKey = `${options.owner}:${token}:${path}`;
   if (method !== "GET") clearReadCache();
@@ -122,7 +123,7 @@ export async function api<T>(path: string, options: { owner: string | null; meth
   if (response.status === 204) return undefined as T;
   let value: T;
   try {
-    value = await response.json() as T;
+    value = (options.as === "blob" ? await response.blob() : await response.json()) as T;
   } catch {
     throw new ApiError("The server returned an invalid response. Reload to check the server state.");
   }
