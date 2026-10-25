@@ -405,7 +405,10 @@ def delete_source(source_id: int, db_path: Path | None = None, *, owner_id: str 
 
 
 def _fallback_external_id(source_id: int, change: ChangeInput) -> str:
-    parts = [str(source_id), change.url or "", change.title, change.published_at.astimezone(timezone.utc).isoformat()]
+    parts = [str(source_id), change.url or "", change.title]
+    # An undated change carries its fetch time, which differs on each fetch. It would make a new card each time.
+    if change.metadata.get("undated") is not True:
+        parts.append(change.published_at.astimezone(timezone.utc).isoformat())
     return hashlib.sha256("\0".join(parts).encode("utf-8")).hexdigest()
 
 
@@ -426,7 +429,8 @@ def upsert_changes(
                 SELECT id, ?, ?, ?, ?, ?, ?, ?, ? FROM sources WHERE id = ? AND owner_id = ?
                 ON CONFLICT (source_id, external_id) DO UPDATE SET
                     title = excluded.title, url = excluded.url, summary = excluded.summary,
-                    content = excluded.content, published_at = excluded.published_at,
+                    content = excluded.content,
+                    published_at = CASE WHEN ? THEN changes.published_at ELSE excluded.published_at END,
                     fetched_at = excluded.fetched_at, metadata = excluded.metadata
             """,
                 [
@@ -440,6 +444,8 @@ def upsert_changes(
                     _json(change.metadata),
                     source_id,
                     owner_id,
+                    # An undated change carries its fetch time. Keep the time of the first fetch, so the card does not move.
+                    change.metadata.get("undated") is True,
                 ],
             )
 

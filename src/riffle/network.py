@@ -53,6 +53,14 @@ class RequestBudgetExceeded(FetchBudgetExceeded):
     """Optional article fetches can stop without discarding completed entries."""
 
 
+class HttpStatusError(PublicFetchError):
+    """The source answered with a status outside 2xx. Discovery then reads the site's robots.txt."""
+
+    def __init__(self, status: int) -> None:
+        super().__init__(f"Source returned HTTP status {status}")
+        self.status = status
+
+
 def _public_ip(value: str) -> ipaddress.IPv4Address | ipaddress.IPv6Address:
     try:
         address = ipaddress.ip_address(value)
@@ -122,7 +130,7 @@ def validate_public_url(
 
 def validate_source_config(source: SourceCreate) -> None:
     """Validate web source config without network access. Trusted local plugins do not use this entry point."""
-    if source.plugin not in {"rss-atom", "html-news", "x"}:
+    if source.plugin not in {"rss-atom", "html-news", "x", "news-sitemap"}:
         raise PublicFetchError("Only built-in source plugins are available")
     config = source.config
     validate_public_url(config.get("url"))
@@ -133,12 +141,14 @@ def validate_source_config(source: SourceCreate) -> None:
     string_keys = {"url", "profile", "user_agent", "enrichment_profile"}
     list_keys = (
         {"include_any", "exclude_any"}
-        if source.plugin in {"rss-atom", "x"}
+        if source.plugin in {"rss-atom", "x", "news-sitemap"}
         else {"exclude_path_prefixes", "title_suffixes"}
     )
     allowed_keys = string_keys | list_keys
     if source.plugin == "x":
         allowed_keys -= {"enrichment_profile", "user_agent"}
+    if source.plugin == "news-sitemap":
+        allowed_keys -= {"enrichment_profile"}
     if source.plugin == "html-news":
         string_keys.add("article_path_prefix")
         allowed_keys |= {"article_path_prefix", "limit"}
@@ -346,9 +356,7 @@ class PublicFetcher:
                         target = validate_public_url(location, base_url=target)
                         continue
                     if not 200 <= response.status < 300:
-                        raise PublicFetchError(
-                            f"Source returned HTTP status {response.status}"
-                        )
+                        raise HttpStatusError(response.status)
                     # Identity-only avoids decompression bombs. Add bounded decompression if a required source mandates compression.
                     if (
                         headers.get("content-encoding", "identity").lower()

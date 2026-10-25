@@ -1,4 +1,4 @@
-"""Discover RSS/Atom drafts without a candidate crawl or persistence."""
+"""Discover RSS/Atom and news sitemap drafts without a candidate crawl or persistence."""
 
 from html.parser import HTMLParser
 from string import ascii_letters, digits
@@ -8,7 +8,8 @@ import httpx
 
 from riffle.feeds import fetch_feed, github_release_repository
 from riffle.models import SourceCreate
-from riffle.network import PublicFetcher, PublicFetchError, validate_public_url
+from riffle.network import FetchBudgetExceeded, HttpStatusError, PublicFetcher, PublicFetchError, validate_public_url
+from riffle.plugins.news_sitemap import is_news_sitemap
 from riffle.social import X_HOSTS, social_url, x_username
 
 
@@ -168,13 +169,63 @@ def _source(url: httpx.URL, *titles: str) -> SourceCreate:
     )
 
 
+def _sitemap_source(url: httpx.URL) -> SourceCreate:
+    return SourceCreate(
+        plugin="news-sitemap",
+        name=f"{url.host.removeprefix('www.')} news sitemap"[:200],
+        config={"url": str(url)},
+        enabled=True,
+    )
+
+
+def _robots_news_sitemaps(client: PublicFetcher, url: httpx.URL) -> list[SourceCreate]:
+    """News sitemaps that the origin's robots.txt lists. A missing or failing robots.txt lists none.
+
+    Limit: only sitemap URLs with "news" in their path or query count, because discovery never fetches candidates.
+    Revisit when a site names its news sitemap otherwise."""
+    try:
+        robots = client.get(f"{url.scheme}://{url.netloc.decode('ascii')}/robots.txt")
+    except FetchBudgetExceeded:
+        raise
+    except PublicFetchError:
+        return []
+    result: list[SourceCreate] = []
+    for line in robots.text.splitlines():
+        key, _, value = line.partition(":")
+        if key.strip().lower() != "sitemap":
+            continue
+        try:
+            candidate = validate_public_url(value.strip(), base_url=robots.url)
+        except PublicFetchError:
+            continue
+        # The host does not count: news.example/sitemap.xml is a general sitemap.
+        if "news" not in candidate.raw_path.decode("ascii").lower():
+            continue
+        if all(source.config["url"] != str(candidate) for source in result):
+            result.append(_sitemap_source(candidate))
+        if len(result) == 10:
+            break
+    return result
+
+
 def discover_sources(value: str) -> list[SourceCreate]:
-    """Read a target with repository fallback. Preview verifies alternates. The API owns the shared fetch slot."""
+    """Read a target with repository fallback. Preview verifies alternates. The API owns the shared fetch slot.
+
+    A site without a feed can still list a news sitemap in robots.txt. Discovery reads it when the target
+    answers with an error status, or is a page without feed links. GitHub targets never fall back."""
     url = normalize_discovery_url(value)
     if url.host in X_HOSTS:
         return [SourceCreate(name=f"@{x_username(url)} on X", plugin="x", config={"url": str(url)}, enabled=True)]
     client = PublicFetcher()
-    response, parsed, _ = fetch_feed(client, str(url))
+    github = url.host in {"github.com", "www.github.com"}
+    try:
+        response, parsed, _ = fetch_feed(client, str(url))
+    except HttpStatusError:
+        if github or not (result := _robots_news_sitemaps(client, url)):
+            raise
+        return result
+    if is_news_sitemap(response.content):
+        return [_sitemap_source(response.url)]
     if parsed.get("version"):
         title = parsed.feed.get("title", "")
         repository = github_release_repository(url)
@@ -203,5 +254,7 @@ def discover_sources(value: str) -> list[SourceCreate]:
             result.append(_source(candidate, title, "".join(parser.title)))
             if len(result) == 10:
                 break
+        if not result and not github:
+            result = _robots_news_sitemaps(client, response.url)
     client.check_deadline()
     return result

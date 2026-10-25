@@ -92,3 +92,9 @@ test("draft identity treats normalized whitespace and reverted fields as unchang
   const html = { ...rss, plugin: "html-news", config: { url: rss.config.url, profile: "Work", article_path_prefix: "/news/", limit: 20 } };
   assert.equal(draftSignature(toDraft(html)), draftSignature(toDraft({ ...html, config: { ...html.config, article_path_prefix: " /news/ ", limit: "20" } })));
 });
+
+test("news sitemap drafts keep filters and user agent but drop enrichment and HTML options", () => {
+  const draft = toDraft({ name: "Reuters", enabled: true, plugin: "news-sitemap", config: { url: "https://www.reuters.com/news-sitemap.xml", profile: "Work", include_any: ["AI agent"], enrichment_profile: "release-notes", user_agent: "Agent", article_path_prefix: "/news", limit: 10 } });
+  assert.deepEqual(normalizedSource(draft).config, { url: "https://www.reuters.com/news-sitemap.xml", profile: "Work", include_any: ["AI agent"], exclude_any: [], user_agent: "Agent" });
+  assert.notEqual(fetchSignature(draft), fetchSignature({ ...draft, include: "OpenAI" }));
+});

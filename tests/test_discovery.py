@@ -205,8 +205,10 @@ def test_only_exact_github_hosts_map(wire: Wire, host: str) -> None:
     assert str(normalize_discovery_url(url)) == url
     wire.responses.append(response(b"<html><title>Not a feed</title></html>"))
     assert discover_sources(url) == []
-    assert wire.lookups == [(host, 443)]
+    # A page without feed links also reads robots.txt of the same host, in search of a news sitemap.
+    assert wire.lookups == [(host, 443), (host, 443)]
     assert b"GET /Other/Repo/issues HTTP/1.1" in wire.sockets[0].sent
+    assert b"GET /robots.txt HTTP/1.1" in wire.sockets[1].sent
 
 
 @pytest.mark.parametrize("suffix", ["", "/releases", "/releases/latest", "/tags"])
@@ -333,7 +335,8 @@ def test_suffix_is_not_feed_evidence_and_no_html_plugin_guess(
         response(body, headers=b"Content-Type: application/rss+xml\r\n")
     )
     assert discover_sources("http://example.com/news.rss") == []
-    assert len(wire.sockets) == 1
+    assert len(wire.sockets) == 2
+    assert b"GET /robots.txt HTTP/1.1" in wire.sockets[1].sent
 
 
 def test_alternate_tokens_case_parameters_and_names(wire: Wire) -> None:

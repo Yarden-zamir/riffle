@@ -72,7 +72,7 @@ Behavior:
 - DuckDB stores changes durably under their source owner. Equal source URLs do not create shared data across owners.
 - Changes dedupe by `(source_id, external_id)`.
 - If a plugin does not provide `external_id`, Riffle derives one from source ID, URL, title, and publication time.
-- A refresh updates known changes: title, URL, text, publication time, fetched time, and metadata.
+- A refresh updates known changes: title, URL, text, publication time, fetched time, and metadata. A change with `metadata.undated: true` keeps the publication time of its first fetch.
 - A refresh preserves `dismissed`, `saved`, `note`, and `state_updated_at`.
 - The backend owns this private state. Browser `localStorage` is not the state store.
 - Feed windows filter results. They do not expire or delete data.
@@ -98,7 +98,7 @@ Behavior:
 
 ### Loading
 
-Web requests use only the built-in `rss-atom`, `html-news`, and `x` plugins. The web API accepts no arbitrary plugin uploads.
+Web requests use only the built-in `rss-atom`, `html-news`, `x`, and `news-sitemap` plugins. The web API accepts no arbitrary plugin uploads.
 Web requests never load local plugins or accept local overrides of built-in plugins.
 
 The trusted CLI loads built-in plugins first, then local plugins from:
@@ -153,7 +153,7 @@ Behavior:
 - Fetches public HTTP or HTTPS feeds under the network limits below.
 - Parses RSS and Atom entries.
 - Uses published, updated, or created timestamps when available.
-- Entries without timestamps are assigned the generation window end time.
+- Entries without timestamps are assigned the generation window end time and `metadata.undated: true`, so later refreshes keep the time of the first fetch.
 - Filters entries to the requested time window.
 - Applies `include_any` before `exclude_any` against title, URL, summary, and content.
 
@@ -183,6 +183,28 @@ Key: `html-news`
 - `article_path_prefix` selects article links and is required.
 - Optional `limit` accepts an integer from 1 to 100.
 - Article requests use the same network budget as the index request.
+- The publication time is the first visible `Month D, YYYY` date. A page without one gets the generation window end time and `metadata.undated: true`, so later refreshes keep the time of the first fetch.
+
+### Built-In News Sitemap Plugin
+
+Key: `news-sitemap`
+
+Required config:
+
+- `url`: a Google News sitemap (`urlset` with `news:news` entries) or a sitemap index of such sitemaps.
+
+Optional config:
+
+- `user_agent`: Custom HTTP user agent.
+- `include_any` and `exclude_any`: the same terms and rules as `rss-atom`, matched against the news title, URL, and news keywords.
+
+Behavior:
+
+- Each entry needs a web `loc`, a `news:title`, and a W3C `news:publication_date`. Entries without them are skipped. A date without a zone counts as UTC.
+- A sitemap index reads at most 8 child sitemaps in document order. Reading stops after a child whose newest entry is older than the window. A child without news entries does not stop it.
+- Documents with a document type or entity declaration, in any encoding, and documents that are not sitemaps fail as source errors. So does an index that lists a document other than a `urlset`. An empty `urlset` is a valid empty result.
+- Changes have the title, URL, and publication date, an empty summary, `external_id` set to the URL (a `sha256:` hash for URLs over 500 characters), and `feed_url`, `publication`, and `keywords` metadata.
+- The plugin never fetches article pages, so it works for sites that refuse article requests, such as Reuters.
 
 ### Source Discovery
 
@@ -193,11 +215,12 @@ Key: `html-news`
 - GitHub `/tags` maps to `/tags.atom`; `/commits` maps to default-branch `/commits.atom`. Direct release, tag, and commit Atom URLs retain their stream and query string.
 - Direct `/commits/{branch}.atom` accepts valid normalized branch names, including slash-separated and percent-encoded branches, without loss of URL encoding.
 - Other GitHub paths, such as `/issues` and branch HTML `/commits/main`, are rejected rather than mapped to a releases feed.
-- Discovery reads the normalized target and, only for qualifying empty releases, its commit fallback. It recognizes RSS/Atom from the body, including valid empty feeds.
+- Discovery reads the normalized target and, only for qualifying empty releases, its commit fallback. It recognizes RSS/Atom from the body, including valid empty feeds, and news sitemaps or sitemap indexes, which become `news-sitemap` candidates.
+- A non-GitHub target that answers with an error status, or a page without advertised alternates, also reads `/robots.txt` on the same origin. Its `Sitemap:` URLs with `news` in the path or query become `news-sitemap` candidates. Without one, an error status remains a discovery failure.
 - HTML discovery accepts `<link rel="alternate">` with RSS/Atom media types. Relative URLs use the final response URL and the first valid `<base href>`.
 - Discovery rejects structurally unsafe candidate URLs and returns at most 10 distinct URLs. It does not resolve candidate DNS or fetch alternate candidates.
 - Preview verifies a selected candidate through the normal public fetch checks. An advertised alternate is not proof of a valid feed.
-- Discovery returns `[]` when the response contains no direct feed or structurally safe advertised alternate.
+- Discovery returns `[]` when the response contains no direct feed, news sitemap, structurally safe advertised alternate, or robots.txt news sitemap.
 - Discovery never guesses HTML selectors or persists profiles, sources, changes, or state.
 - Discovery uses the account and request-header checks. Errors include `401`, `412`, `403`, `422`, `429`, and `502`, as defined in the frontend contract.
 
@@ -354,7 +377,7 @@ Behavior:
 - One source search input matches names against saved sources and optional catalog suggestions. It does not search the full web.
 - URLs, bare domains, and GitHub `owner/repo` offer an explicit Discover action. Keystrokes never trigger discovery or external source fetches.
 - Name queries can request catalog suggestions after a debounce. Catalog failure does not block link discovery; no preset is required.
-- A single discovery result automatically selects the RSS/Atom handler and starts preview. Multiple results require a choice that automatically starts preview.
+- A single discovery result automatically selects its handler and starts preview. Multiple results require a choice that automatically starts preview.
 - Discovery and preview work without a profile. Profile creation, profile selection, and source save remain explicit actions.
 - Only a normalized fetch-signature change invalidates preview. Name, profile selection, inline profile creation, profile rename, and enabled-state changes retain preview.
 - Profile rename updates the selected source and draft membership without a source write. A clean draft stays clean.

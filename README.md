@@ -2,6 +2,8 @@
 
 [![kitshn](https://kitshn.yarden-zamir.com/b/Yarden-zamir/riffle.svg)](https://riffle.yarden-zamir.com)
 
+Paste a news site without RSS, such as Reuters, into source discovery to follow its Google News sitemap with the `news-sitemap` plugin. Discovery finds the sitemap in the site's robots.txt.
+
 Paste X/Twitter or Bluesky profile/post links into source discovery to follow an account without API keys. X uses its public embedded timeline, which may be unavailable or rate-limited; Bluesky uses public RSS. Social subscriptions produce one card per post and retain the usual profile, shelf, note, and read-state controls.
 
 Personal changelog and news tracker with durable profiles, source subscriptions, and GitHub or anonymous browser identity.

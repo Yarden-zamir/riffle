@@ -42,6 +42,7 @@ from riffle.network import (
 )
 from riffle.plugin import PluginConfigError, PluginManager
 from riffle.plugins.html_news import HtmlNewsPlugin
+from riffle.plugins.news_sitemap import NewsSitemapPlugin
 from riffle.plugins.rss_atom import RssAtomPlugin
 from riffle.plugins.x import XPlugin, XUnavailable
 from riffle.refresh import HourlyRefreshLoop
@@ -124,7 +125,7 @@ def create_app() -> FastAPI:
         origins.append(public_origin)
     if "*" in origins:
         raise ValueError("CORS requires explicit origins")
-    manager = PluginManager([RssAtomPlugin(), HtmlNewsPlugin(), XPlugin()])
+    manager = PluginManager([RssAtomPlugin(), HtmlNewsPlugin(), XPlugin(), NewsSitemapPlugin()])
     # Shares copy only the settings that a plugin declares in its config schema.
     share_keys: dict[str, frozenset[str]] = {}
     for plugin in manager.list():

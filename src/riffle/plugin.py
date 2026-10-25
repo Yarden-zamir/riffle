@@ -99,10 +99,11 @@ def load_local_plugins(directories: list[Path] | None = None) -> list[SourcePlug
 
 def default_plugin_manager() -> PluginManager:
     from riffle.plugins.html_news import HtmlNewsPlugin
+    from riffle.plugins.news_sitemap import NewsSitemapPlugin
     from riffle.plugins.rss_atom import RssAtomPlugin
     from riffle.plugins.x import XPlugin
 
-    manager = PluginManager([RssAtomPlugin(), HtmlNewsPlugin(), XPlugin()])
+    manager = PluginManager([RssAtomPlugin(), HtmlNewsPlugin(), XPlugin(), NewsSitemapPlugin()])
     for plugin in load_local_plugins():
         manager.register(plugin)
     return manager

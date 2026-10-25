@@ -61,6 +61,18 @@ uv run riffle sources add "Gemini and Gemma on Google Developers Blog" --plugin 
 uv run riffle sources add-rss "Google Gen AI Python SDK Releases" "https://github.com/googleapis/python-genai/releases.atom"
 ```
 
+## News Sitemaps
+
+Some news sites publish no feed, but list a Google News sitemap in robots.txt. The `news-sitemap` plugin reads it. Verified on 2026-10-25.
+
+| Topic | Source | URL | Notes |
+| --- | --- | --- | --- |
+| AI agents | Reuters | `https://www.reuters.com/arc/outboundfeeds/news-sitemap-index/?outputType=xml` | Reuters refuses article requests, so cards hold titles only. Use `include_any` terms. The index covers about two days. |
+
+```sh
+uv run riffle sources add "Reuters: AI agents" --plugin news-sitemap --config url="https://www.reuters.com/arc/outboundfeeds/news-sitemap-index/?outputType=xml" --config include_any="AI agent"
+```
+
 ## Games Profile Sources
 
 These sources are seeded under the `games` profile.

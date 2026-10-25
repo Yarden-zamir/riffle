@@ -37,12 +37,12 @@ def _entry_link(entry: Any) -> str | None:
     return None
 
 
-def _entry_datetime(entry: Any, window: TimeWindow) -> datetime:
+def _entry_datetime(entry: Any) -> datetime | None:
     for key in ("published_parsed", "updated_parsed", "created_parsed"):
         parsed = _entry_value(entry, key)
         if parsed:
             return datetime.fromtimestamp(calendar.timegm(parsed), tz=timezone.utc)
-    return window.end
+    return None
 
 
 def _string_list_config(config: dict[str, Any], key: str) -> list[str]:
@@ -128,7 +128,9 @@ class RssAtomPlugin:
         changes: list[ChangeInput] = []
         for entry in entries[:MAX_ENTRIES]:
             client.check_deadline()
-            published_at = _entry_datetime(entry, window)
+            # An entry without a date gets the fetch time. The store keeps the first such time, so the card does not move.
+            dated = _entry_datetime(entry)
+            published_at = dated or window.end
             if published_at < window.start or published_at > window.end:
                 continue
 
@@ -182,6 +184,7 @@ class RssAtomPlugin:
                         "raw_title": _metadata_text(str(title)),
                         "raw_summary": _metadata_text(str(summary)),
                         "raw_content": _metadata_text(content),
+                        **({} if dated else {"undated": True}),
                     },
                 )
             )
