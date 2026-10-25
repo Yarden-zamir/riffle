@@ -102,18 +102,6 @@ export function ChangeCard({ change, location, focused, pending, noteDraft, note
 
       <div className="grid gap-0 md:grid-cols-[minmax(0,1fr)_210px]">
         <div className="min-w-0 p-3 sm:p-5">
-          {imageUrl && !imageFailed ? (
-            // The first image of the post. It is decorative: the title next to it names the post.
-            <img
-              alt=""
-              className="mb-4 h-48 w-full rounded border-2 border-line bg-raised object-cover object-top sm:h-64"
-              decoding="async"
-              loading="lazy"
-              onError={() => setImageFailed(true)}
-              referrerPolicy="no-referrer"
-              src={imageUrl}
-            />
-          ) : null}
           <div className="flex flex-wrap items-center gap-2 text-xs font-extrabold uppercase tracking-[0.06em] text-muted">
             <button
               className="sticker cursor-pointer bg-info text-[0.7rem]"
@@ -151,6 +139,18 @@ export function ChangeCard({ change, location, focused, pending, noteDraft, note
           ) : (
             <div className="mt-4 rounded border-2 border-dashed border-line bg-raised px-4 py-3 text-sm font-medium text-muted">No preview text came back for this source.</div>
           )}
+          {imageUrl && !imageFailed ? (
+            // The first image of the post. It is decorative: the title next to it names the post.
+            <img
+              alt=""
+              className="mt-3 h-48 w-full rounded border-2 border-line bg-raised object-cover object-top sm:mt-4 sm:h-64"
+              decoding="async"
+              loading="lazy"
+              onError={() => setImageFailed(true)}
+              referrerPolicy="no-referrer"
+              src={imageUrl}
+            />
+          ) : null}
         </div>
 
         <div className={`flex flex-col justify-end border-t-2 border-line p-3 sm:p-4 md:justify-start md:gap-4 md:border-l-2 md:border-t-0 ${onShelf ? "bg-warning-surface" : "bg-raised"}`}>
