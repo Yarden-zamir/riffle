@@ -179,12 +179,15 @@ An active URL `source` filter adds `source_id={id}` to `GET /changes`. The serve
 1. In Manage profiles, a selected profile shows its share link, or a Create share link action. The link is `/share/{token}` on the site origin.
 2. Before a link exists, the editor states that anyone with the link can see and copy the enabled sources, and that read marks, shelf, and notes stay private.
 3. Copy link copies the link. Stop sharing deletes the share, and the old link returns `404` for everyone.
-4. The `/share/{token}` path renders the shared profile page instead of the feed. It shows the sharer's GitHub login when known, the profile name, and each source name with its host.
+4. The `/share/{token}` path renders the shared profile page instead of the feed. It shows the sharer's GitHub login when known and the profile name. The import form and Import button appear before the source list. A native disclosure starts collapsed and shows the source count (for example, `Show 44 sources`); opening it shows each source name with its host.
 5. The page proposes the shared profile name, or `<name> (shared)` when the owner already has a profile with that name. The visitor can change the name.
 6. When the name matches an existing profile, the page states that the sources join it and that sources it already has stay as they were.
 7. Import requires an explicit click. The result states the new sources, the copied items, and the skipped sources, and links to the feed of that profile.
 8. Without GitHub sign-in, the page states that the import goes into this browser only. It links to GitHub sign-in when sign-in is available.
 9. A `404` states that the link is unknown or that its owner stopped sharing. A `409` states the source and profile limits.
+10. The server sends crawler-readable title, description, Open Graph, and Twitter summary-card tags in the initial HTML, without needing JavaScript or identity. For example: `Yarden-zamir's dev desk on Riffle` and `44 sources. Import them into your own Riffle feed.` Without a login, the title is `dev desk on Riffle`. The count includes only the sources in `SharedProfile`. All dynamic values are HTML-escaped.
+11. An unknown or revoked token gets generic Riffle metadata and the existing page shell; its `GET /shares/{token}` still returns `404`. Share HTML uses `Cache-Control: private, no-store`, including unknown links.
+12. `SharedProfile` has no recent items. The page shows no sample headlines and adds no fields or requests for them. Public headline samples would need new privacy approval and an API contract change.
 
 ## Source Discovery
 
@@ -359,6 +362,7 @@ PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs node --test tests/sourc
 ```
 
 Without `PLAYWRIGHT_MODULE`, `node --test tests/sourceEditor.browser.mjs` skips the browser suite. A skip does not verify browser behavior.
+Share-page checks use the same setup: `PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs node --test tests/sharePage.browser.mjs`. They verify import-before-list ordering, collapsed counts, keyboard disclosure, explicit import, and unknown-link behavior at desktop and phone widths in light and dark modes. `SHARE_SCREENSHOTS=/absolute/output/directory` optionally saves the four desktop/phone screenshots using local fixture data. Fast server metadata checks run with `uv run pytest tests/test_share_preview.py tests/test_profile_shares.py` and need no frontend build or browser.
 Verify normalization, valid empty feeds, alternate resolution, candidate limits, deferred candidate fetches, no persistence, error statuses, and shared concurrency.
 Verify automatic preview after result selection and profile-free preview.
 Verify preview retention after name, profile, enabled-state, inline profile creation, and profile rename changes.
