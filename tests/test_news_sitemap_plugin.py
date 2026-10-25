@@ -72,6 +72,16 @@ def test_fetch_keeps_window_and_filters_newest_first(wire: Wire) -> None:
                                    "keywords": "AI agent, regulation"}
 
 
+def test_long_urls_get_a_bounded_external_id(wire: Wire) -> None:
+    path = "/tech/" + "a" * 900
+    wire.responses.append(response(urlset(entry(path, "Long link", "2026-10-24T10:00:00Z"))))
+
+    [change] = NewsSitemapPlugin().fetch(source(), WINDOW)
+
+    assert change.url == f"http://news.example{path}"
+    assert change.external_id is not None and change.external_id.startswith("sha256:") and len(change.external_id) <= 500
+
+
 def test_entries_without_title_date_or_web_link_are_skipped(wire: Wire) -> None:
     wire.responses.append(response(urlset(
         entry("/ok", "Kept", "2026-10-24T10:00:00Z"),
@@ -86,18 +96,19 @@ def test_entries_without_title_date_or_web_link_are_skipped(wire: Wire) -> None:
 
 def test_index_reads_children_until_a_page_is_older_than_the_window(wire: Wire) -> None:
     wire.responses.extend([
-        response(index("/news.xml?page=1", "http://news.example/news.xml?page=2", "/news.xml?page=3", "/news.xml?page=4")),
-        # An updated old story on the first page does not stop the reading.
+        response(index("/news.xml?page=1", "http://news.example/news.xml?page=2", "/news.xml?page=3", "/news.xml?page=4", "/news.xml?page=5")),
+        # An updated old story on the first page does not stop the reading, and neither does an empty page.
         response(urlset(entry("/a", "First page", "2026-10-24T10:00:00Z"), entry("/updated", "Updated story", "2026-09-01T10:00:00Z"))),
-        response(urlset(entry("/b", "Second page", "2026-10-20T10:00:00Z"))),
-        response(urlset(entry("/c", "Third page, all older", "2026-10-10T10:00:00Z"))),
+        response(urlset("<url><loc>http://news.example/plain</loc></url>")),
+        response(urlset(entry("/b", "Third page", "2026-10-20T10:00:00Z"))),
+        response(urlset(entry("/c", "Fourth page, all older", "2026-10-10T10:00:00Z"))),
     ])
 
     changes = NewsSitemapPlugin().fetch(source(url="http://news.example/index.xml"), WINDOW)
 
-    assert [change.title for change in changes] == ["First page", "Second page"]
-    assert len(wire.sockets) == 4
-    assert b"GET /news.xml?page=3 HTTP/1.1" in wire.sockets[3].sent
+    assert [change.title for change in changes] == ["First page", "Third page"]
+    assert len(wire.sockets) == 5
+    assert b"GET /news.xml?page=4 HTTP/1.1" in wire.sockets[4].sent
     assert not wire.responses
 
 

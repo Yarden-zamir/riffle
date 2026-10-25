@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from datetime import datetime, time, timezone
 from typing import Any
@@ -148,7 +149,8 @@ class NewsSitemapPlugin:
             entries.extend(page)
             # Pages run from new to old by last change, so one page can hold an old story that was updated.
             # Only a page whose newest story is older than the window means the next pages are older still.
-            if not page or max(entry.published_at for entry in page) < window.start:
+            # An empty page proves nothing, so reading goes on.
+            if page and max(entry.published_at for entry in page) < window.start:
                 break
 
         changes: list[ChangeInput] = []
@@ -161,7 +163,8 @@ class NewsSitemapPlugin:
             if not _matches_filters("\n".join([entry.title, entry.url, entry.keywords]), include_any, exclude_any):
                 continue
             changes.append(ChangeInput(
-                external_id=entry.url,
+                # External ids hold at most 500 characters. A longer URL gets a stable hash instead.
+                external_id=entry.url if len(entry.url) <= 500 else "sha256:" + hashlib.sha256(entry.url.encode()).hexdigest(),
                 title=entry.title[:500],
                 url=entry.url,
                 published_at=entry.published_at,

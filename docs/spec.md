@@ -201,9 +201,9 @@ Optional config:
 Behavior:
 
 - Each entry needs a web `loc`, a `news:title`, and a W3C `news:publication_date`. Entries without them are skipped. A date without a zone counts as UTC.
-- A sitemap index reads at most 8 child sitemaps in document order. Reading stops after a child whose newest entry is older than the window.
+- A sitemap index reads at most 8 child sitemaps in document order. Reading stops after a child whose newest entry is older than the window. A child without news entries does not stop it.
 - Documents with a document type or entity declaration, and documents that are not sitemaps, fail as source errors. An empty `urlset` is a valid empty result.
-- Changes have the title, URL, and publication date, an empty summary, `external_id` set to the URL, and `feed_url`, `publication`, and `keywords` metadata.
+- Changes have the title, URL, and publication date, an empty summary, `external_id` set to the URL (a `sha256:` hash for URLs over 500 characters), and `feed_url`, `publication`, and `keywords` metadata.
 - The plugin never fetches article pages, so it works for sites that refuse article requests, such as Reuters.
 
 ### Source Discovery
