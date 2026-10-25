@@ -197,11 +197,11 @@ An active URL `source` filter adds `source_id={id}` to `GET /changes`. The serve
 7. A release tag or latest-release URL selects the repository's releases feed, not a feed limited to one release.
 8. GitHub `/tags` maps to `/tags.atom`; `/commits` maps to default-branch `/commits.atom`. Direct release, tag, and commit Atom URLs preserve their stream and query string.
 9. Unsupported GitHub paths, such as `/issues` and branch HTML `/commits/main`, return `422`. Direct `/commits/{branch}.atom` accepts valid branch names, including slash-separated or percent-encoded branches.
-10. Discovery reads the normalized target, with an additional commit request only under GitHub Release Fallback below. Body parsing recognizes RSS/Atom, including valid empty feeds; suffixes and media types alone prove nothing.
+10. Discovery reads the normalized target, with an additional commit request only under GitHub Release Fallback below. Body parsing recognizes RSS/Atom, including valid empty feeds, and news sitemaps or sitemap indexes; suffixes and media types alone prove nothing. A non-GitHub target that answers with an error status, or a page without advertised alternates, adds one request for `/robots.txt` on the same origin.
 11. HTML discovery accepts `<link rel="alternate">` with `application/rss+xml` or `application/atom+xml`. Relative links use the final response URL and first valid `<base href>`.
 12. Candidates pass structural public-URL checks, deduplicate by resolved URL, and stop at 10. Discovery neither resolves candidate DNS nor fetches alternate candidates.
-13. Feed candidates use `plugin: "rss-atom"`; X candidates use `plugin: "x"`. Both include `enabled: true`, a display name, and `config.url`, contain no profile, and remain unverified until preview.
-14. A successful response with no direct feed or advertised alternates returns `[]`. It does not invent an HTML handler or selectors.
+13. Feed candidates use `plugin: "rss-atom"`; X candidates use `plugin: "x"`; news sitemap candidates use `plugin: "news-sitemap"`. All include `enabled: true`, a display name, and `config.url`, contain no profile, and remain unverified until preview. Robots.txt candidates are the `Sitemap:` URLs with `news` in their path or query.
+14. A successful response with no direct feed, news sitemap, advertised alternate, or robots.txt news sitemap returns `[]`. An error status without a robots.txt news sitemap remains a discovery failure. It does not invent an HTML handler or selectors.
 15. One result automatically selects its handler and starts preview. With multiple results, an explicit choice automatically starts preview.
 16. Preview requires no profile. Save requires explicit profile selection or creation and an explicit save action.
 17. Only a normalized fetch-signature change invalidates preview, as defined in Preview Validity. Name, profile, and enabled-state edits retain preview.

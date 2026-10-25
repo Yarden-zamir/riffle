@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api, errorMessage, shareUrl, type Plugin, type Profile, type Share, type Source, type SourceCreate, type TimeWindow } from "../lib/api";
 import { formatDate, renderedHtml, safeUrl, type Change } from "../lib/changes";
 import { discoveryUrl } from "../lib/sourceDiscovery";
-import { draftSignature, fetchSignature, normalizedSource, stringConfig, toDraft, type Draft } from "../lib/sourceDraft";
+import { draftSignature, EDITABLE_PLUGINS, FILTER_PLUGINS, fetchSignature, normalizedSource, stringConfig, toDraft, type Draft } from "../lib/sourceDraft";
 
 type PreviewChange = Pick<Change, "title" | "url" | "summary" | "content" | "published_at" | "external_id" | "metadata">;
 type Preview = { changes: PreviewChange[]; window: TimeWindow };
@@ -252,7 +252,7 @@ export function SourceEditor({ owner, profiles: suppliedProfiles, onChanged, onC
       setError("Select an existing profile, or create one before you save.");
       return null;
     }
-    if (!["rss-atom", "html-news", "x"].includes(value.source.plugin) || !plugins.some((plugin) => plugin.key === value.source.plugin)) {
+    if (!EDITABLE_PLUGINS.includes(value.source.plugin) || !plugins.some((plugin) => plugin.key === value.source.plugin)) {
       setError("Select a supported plugin to preview and save.");
       setAdvanced(true);
       return null;
@@ -356,7 +356,8 @@ export function SourceEditor({ owner, profiles: suppliedProfiles, onChanged, onC
   const needle = query.trim().toLowerCase();
   const link = discoveryUrl(query);
   const matches = sources.filter((source) => [source.name, source.plugin, stringConfig(source, "url"), stringConfig(source, "profile")].some((value) => value.toLowerCase().includes(needle)));
-  const supported = draft && ["rss-atom", "html-news", "x"].includes(draft.source.plugin) && plugins.some((plugin) => plugin.key === draft.source.plugin);
+  const supported = draft && EDITABLE_PLUGINS.includes(draft.source.plugin) && plugins.some((plugin) => plugin.key === draft.source.plugin);
+  const hasEnrichment = Boolean(plugins.find((plugin) => plugin.key === draft?.source.plugin)?.config_schema.properties?.enrichment_profile);
   const enrichment = plugins.find((plugin) => plugin.key === draft?.source.plugin)?.config_schema.properties?.enrichment_profile?.enum
     ?.filter((name): name is string => typeof name === "string") ?? [];
   const saveBlocked = !supported ? "Select a supported plugin."
@@ -415,7 +416,7 @@ export function SourceEditor({ owner, profiles: suppliedProfiles, onChanged, onC
             <form id="source-draft" noValidate onSubmit={(event) => { event.preventDefault(); save(true); }}>
               <fieldset disabled={Boolean(busy) || !ready} className="grid min-w-0 gap-4">
                 <p className="text-xs font-extrabold uppercase tracking-[0.06em] text-muted">{selected ? `Current subscription / ${selected.enabled ? "Enabled" : "Disabled"}` : "New candidate"}{needsSave ? " / Unsaved" : ""}</p>
-                <p className="break-all text-sm text-muted">{draft.source.plugin === "rss-atom" ? "RSS/Atom" : draft.source.plugin === "html-news" ? "Manual HTML news" : draft.source.plugin === "x" ? "X posts" : draft.source.plugin} / {stringConfig(draft.source, "url")}</p>
+                <p className="break-all text-sm text-muted">{draft.source.plugin === "rss-atom" ? "RSS/Atom" : draft.source.plugin === "html-news" ? "Manual HTML news" : draft.source.plugin === "x" ? "X posts" : draft.source.plugin === "news-sitemap" ? "News sitemap" : draft.source.plugin} / {stringConfig(draft.source, "url")}</p>
                 <label>Name<input required maxLength={200} value={draft.source.name} onChange={(event) => edit({ name: event.target.value })} /></label>
                 <div className="flex flex-wrap items-end gap-2">
                   <label className="min-w-0 flex-1">Save in profile<select value={stringConfig(draft.source, "profile")} onChange={(event) => edit({}, { profile: event.target.value })}><option value="">Select a profile to save</option>{profiles.map((profile) => <option key={profile.name}>{profile.name}</option>)}</select></label>
@@ -429,6 +430,7 @@ export function SourceEditor({ owner, profiles: suppliedProfiles, onChanged, onC
                 {!selected ? <label className="flex items-center gap-2"><input type="checkbox" checked={draft.source.enabled} onChange={(event) => edit({ enabled: event.target.checked })} />Enabled</label> : null}
                 {!supported ? <p role="alert" className="text-sm text-error-fg">Select RSS/Atom, HTML news, or X posts to preview and save.</p> : null}
                 {draft.source.plugin === "x" ? <p className="text-sm text-muted">Keyless public timeline, one card per post. X can limit or block this feed; it may not include every recent post.</p> : null}
+                {draft.source.plugin === "news-sitemap" ? <p className="text-sm text-muted">Titles and dates from the sitemap that the site makes for search engines. Cards have no summary, and filters match the title and link.</p> : null}
                 {preview ? <section className="editor-preview border-t-2 border-line pt-4" aria-label="Source preview">
                   <h4 className="text-xl font-extrabold">Preview / {Math.min(preview.changes.length, 10)} items</h4>
                   {preview.changes.some((change) => change.metadata?.fallback_reason === "no_releases") ? <p className="mt-2 text-sm text-muted">This repository has no releases. Each item is one commit.</p> : null}
@@ -440,7 +442,7 @@ export function SourceEditor({ owner, profiles: suppliedProfiles, onChanged, onC
                     <div className="riffle-rendered mt-3 max-h-64 overflow-auto text-sm leading-6" dangerouslySetInnerHTML={{ __html: renderedHtml(change.content || change.summary) }} />
                   </article>)}</div>
                 </section> : <p className="editor-notice">No current preview. Preview this source before you save. No profile is required.</p>}
-                {["rss-atom", "x"].includes(draft.source.plugin) ? <details open={filtersOpen} onToggle={(event) => setFiltersOpen(event.currentTarget.open)} className="border-t-2 border-raised pt-3">
+                {FILTER_PLUGINS.includes(draft.source.plugin) ? <details open={filtersOpen} onToggle={(event) => setFiltersOpen(event.currentTarget.open)} className="border-t-2 border-raised pt-3">
                   <summary className="cursor-pointer text-sm font-bold">Filters / {filterCounts.some(Boolean) ? `${filterCounts[0]} include, ${filterCounts[1]} exclude` : "None"}</summary>
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
                     <label>Include any term<textarea rows={3} value={draft.include} onChange={(event) => editDraft({ ...draft, include: event.target.value })} placeholder="One term per line" /></label>
@@ -450,13 +452,13 @@ export function SourceEditor({ owner, profiles: suppliedProfiles, onChanged, onC
                 <details open={advanced} onToggle={(event) => setAdvanced(event.currentTarget.open)} className="min-w-0 border-y-2 border-raised py-3">
                   <summary className="cursor-pointer text-sm font-bold">Advanced / manual handler, URL &amp; enrichment</summary>
                   <div className="mt-4 grid min-w-0 gap-4">
-                    <label>Plugin<select value={draft.source.plugin} onChange={(event) => edit({ plugin: event.target.value })}>{!supported ? <option value={draft.source.plugin}>{draft.source.plugin} (not editable)</option> : null}{plugins.filter((plugin) => ["rss-atom", "html-news", "x"].includes(plugin.key)).map((plugin) => <option key={plugin.key} value={plugin.key}>{plugin.name}</option>)}</select></label>
+                    <label>Plugin<select value={draft.source.plugin} onChange={(event) => edit({ plugin: event.target.value })}>{!supported ? <option value={draft.source.plugin}>{draft.source.plugin} (not editable)</option> : null}{plugins.filter((plugin) => EDITABLE_PLUGINS.includes(plugin.key)).map((plugin) => <option key={plugin.key} value={plugin.key}>{plugin.name}</option>)}</select></label>
                     <label>Source URL<input type="url" required maxLength={2000} value={stringConfig(draft.source, "url")} onChange={(event) => edit({}, { url: event.target.value })} placeholder="https://example.com/feed.xml" /></label>
                     {draft.source.plugin === "html-news" ? <div className="grid gap-4 sm:grid-cols-2">
                       <label>Article path prefix<input required value={stringConfig(draft.source, "article_path_prefix")} onChange={(event) => edit({}, { article_path_prefix: event.target.value })} placeholder="/news/" /></label>
                       <label>Article limit<input type="number" min={1} max={100} step={1} value={typeof draft.source.config.limit === "number" || typeof draft.source.config.limit === "string" ? draft.source.config.limit : ""} onChange={(event) => edit({}, { limit: event.target.value })} placeholder="Plugin default" /></label>
                     </div> : null}
-                    {draft.source.plugin !== "x" ? <label>Enrichment profile<select value={stringConfig(draft.source, "enrichment_profile")} onChange={(event) => edit({}, { enrichment_profile: event.target.value })}><option value="">Automatic / plugin default</option>{stringConfig(draft.source, "enrichment_profile") && !enrichment.includes(stringConfig(draft.source, "enrichment_profile")) ? <option value={stringConfig(draft.source, "enrichment_profile")}>{stringConfig(draft.source, "enrichment_profile")} (unavailable)</option> : null}{enrichment.map((name) => <option key={name}>{name}</option>)}</select></label> : null}
+                    {hasEnrichment ? <label>Enrichment profile<select value={stringConfig(draft.source, "enrichment_profile")} onChange={(event) => edit({}, { enrichment_profile: event.target.value })}><option value="">Automatic / plugin default</option>{stringConfig(draft.source, "enrichment_profile") && !enrichment.includes(stringConfig(draft.source, "enrichment_profile")) ? <option value={stringConfig(draft.source, "enrichment_profile")}>{stringConfig(draft.source, "enrichment_profile")} (unavailable)</option> : null}{enrichment.map((name) => <option key={name}>{name}</option>)}</select></label> : null}
                   </div>
                 </details>
                 <p className="text-xs leading-5 text-muted">Preview shows up to 10 items. Only fetch settings require another preview; name, profile, and enabled state do not.</p>

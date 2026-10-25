@@ -2,6 +2,10 @@ import type { SourceCreate } from "./api";
 
 export type Draft = { source: SourceCreate; include: string; exclude: string };
 
+// The plugins that the web API accepts and the editor can edit. Plugins in FILTER_PLUGINS take include and exclude terms.
+export const EDITABLE_PLUGINS: readonly string[] = ["rss-atom", "html-news", "x", "news-sitemap"];
+export const FILTER_PLUGINS: readonly string[] = ["rss-atom", "x", "news-sitemap"];
+
 export function stringConfig(source: SourceCreate, key: string) {
   const value = source.config[key];
   return typeof value === "string" ? value : "";
@@ -18,7 +22,7 @@ export function toDraft(source: SourceCreate): Draft {
 
 export function normalizedSource(value: Draft): SourceCreate {
   const config: Record<string, unknown> = { ...value.source.config, url: stringConfig(value.source, "url").trim() };
-  if (["rss-atom", "x"].includes(value.source.plugin)) {
+  if (FILTER_PLUGINS.includes(value.source.plugin)) {
     config.include_any = value.include.split("\n").map((term) => term.trim()).filter(Boolean);
     config.exclude_any = value.exclude.split("\n").map((term) => term.trim()).filter(Boolean);
     delete config.article_path_prefix;
@@ -34,6 +38,7 @@ export function normalizedSource(value: Draft): SourceCreate {
   }
   if (!config.enrichment_profile) delete config.enrichment_profile;
   if (value.source.plugin === "x") { delete config.enrichment_profile; delete config.user_agent; }
+  if (value.source.plugin === "news-sitemap") delete config.enrichment_profile;
   return { ...value.source, name: value.source.name.trim(), config };
 }
 

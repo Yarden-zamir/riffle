@@ -400,6 +400,7 @@ def test_real_discovery_fetch_rejections_are_safe_and_never_persist(
         assert response.status_code == 502, response.text
         assert "SECRET" not in response.text
         assert "127.0.0.1" not in response.text
-        assert len(wire.sockets) == (0 if failure == "private-dns" else 1)
+        # An error status also reads robots.txt, in search of a news sitemap.
+        assert len(wire.sockets) == {"private-dns": 0, "private-redirect": 1, "upstream-error": 2}[failure]
         assert all(sock.closed for sock in wire.sockets)
         assert_no_persistence(headers["X-Riffle-Owner"])
