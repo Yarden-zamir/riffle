@@ -113,9 +113,11 @@ class EnrichmentResult:
     content: str
     quality_flags: list[str]
     profile: str
-    image_url: str | None = None
+    image_urls: tuple[str, ...] = ()
 
 
+# Pictures that a card shows, in post order. A post with more images links to the source for the rest.
+MAX_CARD_IMAGES = 12
 # Characters of text that a card shows. The cut falls between whole blocks or whole list items.
 EXCERPT_TEXT_BUDGET = 1500
 # Kept with their formatting. Only `a` keeps an attribute (`href`). `tt` becomes `code`.
@@ -143,7 +145,7 @@ class _Element:
 @dataclass(frozen=True)
 class Excerpt:
     html: str
-    image_url: str | None
+    image_urls: tuple[str, ...]
 
 
 def card_image_url(attrs: dict[str, str | None]) -> str | None:
@@ -171,13 +173,15 @@ class _ExcerptParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.root = _Element("root")
-        self.image_url: str | None = None
+        self.image_urls: list[str] = []
         self._open: list[_Element] = [self.root]
         self._dropped: list[str] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag == "img" and self.image_url is None:
-            self.image_url = card_image_url(dict(attrs))
+        if tag == "img" and len(self.image_urls) < MAX_CARD_IMAGES:
+            image = card_image_url(dict(attrs))
+            if image and image not in self.image_urls:
+                self.image_urls.append(image)
         if self._dropped or tag in EXCERPT_DROP_TAGS:
             if tag not in VOID_TAGS:
                 self._dropped.append(tag)
@@ -245,7 +249,7 @@ def _is_ignored_excerpt_block(tag: str, text: str, profile: EnrichmentProfile) -
 
 
 def html_excerpt(value: str, profile: EnrichmentProfile, budget: int = EXCERPT_TEXT_BUDGET) -> Excerpt:
-    """The first blocks of an HTML body with their formatting, and the first image that suits a card picture."""
+    """The first blocks of an HTML body with their formatting, and the images that suit card pictures."""
     parser = _ExcerptParser()
     parser.feed(value)
     parser.close()
@@ -280,7 +284,7 @@ def html_excerpt(value: str, profile: EnrichmentProfile, budget: int = EXCERPT_T
         used += len(text)
     if cut:
         parts.append("<p>…</p>")
-    return Excerpt(html="".join(parts), image_url=parser.image_url)
+    return Excerpt(html="".join(parts), image_urls=tuple(parser.image_urls))
 
 
 def is_html(value: str) -> bool:
@@ -499,5 +503,5 @@ def enrich_change(
         content=display_content,
         quality_flags=flags,
         profile=profile.name,
-        image_url=excerpt.image_url if excerpt else None,
+        image_urls=excerpt.image_urls if excerpt else (),
     )

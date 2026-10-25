@@ -115,7 +115,7 @@ type PreviewChange = Pick<Change,
 >;
 ```
 
-`Change.content` can hold an HTML excerpt of the post. The client sanitizes it before it renders. `Change.metadata.image_url`, when present, is the http(s) address of the card picture. The card hides the picture when it does not load.
+`Change.content` can hold an HTML excerpt of the post. The client sanitizes it before it renders. `Change.metadata.image_urls`, when present, lists the http(s) addresses of the card pictures in post order. The card shows them in a row that scrolls sideways, and hides a picture that does not load.
 
 Dates use ISO strings. Required text fields use empty strings rather than `null`.
 Feed windows use `24h`, `7d`, `30d`, `90d`, or `365d`.

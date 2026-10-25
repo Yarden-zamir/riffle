@@ -184,7 +184,7 @@ class RssAtomPlugin:
                         "raw_title": _metadata_text(str(title)),
                         "raw_summary": _metadata_text(str(summary)),
                         "raw_content": _metadata_text(content),
-                        **({"image_url": enriched.image_url} if enriched.image_url else {}),
+                        **({"image_urls": list(enriched.image_urls)} if enriched.image_urls else {}),
                         **({} if dated else {"undated": True}),
                     },
                 )

@@ -44,8 +44,11 @@ export function ChangeCard({ change, location, focused, pending, noteDraft, note
   const noteId = `note-${change.id}`;
   const onShelf = location === "shelf";
   const url = safeUrl(change.url);
-  const imageUrl = typeof change.metadata?.image_url === "string" ? safeUrl(change.metadata.image_url) : null;
-  const [imageFailed, setImageFailed] = useState(false);
+  const images = Array.isArray(change.metadata?.image_urls)
+    ? change.metadata.image_urls.flatMap((value) => (typeof value === "string" ? [safeUrl(value)] : [])).filter((value): value is string => value !== null)
+    : [];
+  const [failedImages, setFailedImages] = useState<ReadonlySet<string>>(new Set());
+  const shownImages = images.filter((image) => !failedImages.has(image));
   const slot = useRef<HTMLDivElement>(null);
   const collapse = useRef<Animation | null>(null);
   const mounted = useRef(true);
@@ -139,17 +142,22 @@ export function ChangeCard({ change, location, focused, pending, noteDraft, note
           ) : (
             <div className="mt-4 rounded border-2 border-dashed border-line bg-raised px-4 py-3 text-sm font-medium text-muted">No preview text came back for this source.</div>
           )}
-          {imageUrl && !imageFailed ? (
-            // The first image of the post. It is decorative: the title next to it names the post.
-            <img
-              alt=""
-              className="mt-3 h-48 w-full rounded border-2 border-line bg-raised object-cover object-top sm:mt-4 sm:h-64"
-              decoding="async"
-              loading="lazy"
-              onError={() => setImageFailed(true)}
-              referrerPolicy="no-referrer"
-              src={imageUrl}
-            />
+          {shownImages.length ? (
+            // The images of the post, in post order. They are decorative: the title names the post.
+            <div className="scrollbar-none mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain sm:mt-4" data-no-swipe={shownImages.length > 1 ? "" : undefined}>
+              {shownImages.map((image) => (
+                <img
+                  alt=""
+                  className={`h-48 shrink-0 snap-start rounded border-2 border-line bg-raised object-cover object-top sm:h-64 ${shownImages.length === 1 ? "w-full" : "w-[85%] sm:w-[70%]"}`}
+                  decoding="async"
+                  key={image}
+                  loading="lazy"
+                  onError={() => setFailedImages((failed) => new Set(failed).add(image))}
+                  referrerPolicy="no-referrer"
+                  src={image}
+                />
+              ))}
+            </div>
           ) : null}
         </div>
 
