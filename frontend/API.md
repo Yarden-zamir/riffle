@@ -115,7 +115,7 @@ type PreviewChange = Pick<Change,
 >;
 ```
 
-`Change.content` can hold an HTML excerpt of the post. The client sanitizes it before it renders. `Change.metadata.image_urls`, when present, lists the http(s) addresses of the card pictures in post order. The card shows them in a row that scrolls sideways, and hides a picture that does not load.
+`Change.content` can hold an HTML excerpt of the post. The client sanitizes it before it renders. `Change.metadata.media`, when present, lists `{ url, kind }` items in post order, where `kind` is `image`, `gif` or `video`. The card shows them in a row that scrolls sideways, and hides an item that does not load. `GET /changes/{id}/media/{index}` returns the bytes of a GIF item, for the scrubber.
 
 Dates use ISO strings. Required text fields use empty strings rather than `null`.
 Feed windows use `24h`, `7d`, `30d`, `90d`, or `365d`.
@@ -145,6 +145,7 @@ Successful responses use JSON unless the route permits `204` below. Extra respon
 | POST | `/sources/{id}/refresh` | No body | `{ changes: Change[], errors: SourceError[], window: TimeWindow }` |
 | GET | `/changes?since={window}&limit=200&include_dismissed=true&profile={encodedName}` | No body | `Change[]` |
 | PATCH | `/changes/{id}` | `ChangeState` | Complete updated `Change` |
+| GET | `/changes/{id}/media/{index}` | No body | `image/gif` bytes of item `index` of `metadata.media`; `404` when that item is not a GIF |
 | POST | `/changes/restore` | `{ ids: number[] }` | Complete updated `Change[]` for the supplied IDs |
 | POST | `/me/import` | No body | `{ profiles: number, sources: number, changes: number }` |
 | POST | `/me/import-state` | `{ state: Record<string, ChangeState> }` | JSON or `204`; body unused |

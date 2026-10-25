@@ -327,7 +327,7 @@ class PublicFetcher:
     def check_deadline(self) -> None:
         _remaining(self.deadline)
 
-    def get(self, url: str) -> httpx.Response:
+    def get(self, url: str, *, max_bytes: int = MAX_RESPONSE_BYTES) -> httpx.Response:
         target = validate_public_url(url)
         try:
             for redirects in range(MAX_REDIRECTS + 1):
@@ -369,7 +369,7 @@ class PublicFetcher:
                     if length is not None and (
                         not length.isascii()
                         or not length.isdecimal()
-                        or int(length) > MAX_RESPONSE_BYTES
+                        or int(length) > max_bytes
                     ):
                         raise PublicFetchError(
                             "Source response exceeds the byte limit or has an invalid length"
@@ -377,7 +377,7 @@ class PublicFetcher:
                     body = bytearray()
                     for chunk in response.iter_stream():
                         self.check_deadline()
-                        if len(body) + len(chunk) > MAX_RESPONSE_BYTES:
+                        if len(body) + len(chunk) > max_bytes:
                             raise PublicFetchError(
                                 "Source response exceeds the byte limit"
                             )

@@ -4,7 +4,7 @@ import html as html_lib
 import uuid
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
-from typing import Callable
+from typing import Callable, Literal
 from urllib.parse import urlsplit
 
 
@@ -113,11 +113,13 @@ class EnrichmentResult:
     content: str
     quality_flags: list[str]
     profile: str
-    image_urls: tuple[str, ...] = ()
+    media: tuple[CardMedia, ...] = ()
 
 
-# Pictures that a card shows, in post order. A post with more images links to the source for the rest.
-MAX_CARD_IMAGES = 12
+# Images and videos that a card shows, in post order. A post with more links to the source for the rest.
+MAX_CARD_MEDIA = 12
+VIDEO_SUFFIXES = (".mp4", ".webm", ".mov", ".m4v")
+MediaKind = Literal["image", "gif", "video"]
 # Characters of text that a card shows. The cut falls between whole blocks or whole list items.
 EXCERPT_TEXT_BUDGET = 1500
 # Kept with their formatting. Only `a` keeps an attribute (`href`). `tt` becomes `code`.
@@ -145,20 +147,20 @@ class _Element:
 @dataclass(frozen=True)
 class Excerpt:
     html: str
-    image_urls: tuple[str, ...]
+    media: tuple[CardMedia, ...]
 
 
-def card_image_url(attrs: dict[str, str | None]) -> str | None:
-    """The address of an image that suits a card picture, or None for icons, badges and emoji."""
-    src = (attrs.get("src") or "").strip()
-    parts = urlsplit(src)
+@dataclass(frozen=True)
+class CardMedia:
+    url: str
+    kind: MediaKind
+
+
+def _lasting_url(url: str) -> str | None:
+    """`url`, or the lasting address of a signed GitHub attachment link. None for a link that is not http(s)."""
+    parts = urlsplit(url.strip())
     if parts.scheme not in {"http", "https"} or not parts.netloc:
         return None
-    if parts.path.lower().endswith(".svg") or "badge" in src.lower() or "emoji" in (attrs.get("class") or ""):
-        return None
-    for size in (attrs.get("width"), attrs.get("height")):
-        if size and size.isdigit() and int(size) < 64:
-            return None
     if parts.netloc == "private-user-images.githubusercontent.com":
         # These links are signed and expire after 300 seconds. The attachment address redirects to a fresh link.
         name = parts.path.rsplit("/", 1)[-1].split(".", 1)[0]
@@ -166,22 +168,64 @@ def card_image_url(attrs: dict[str, str | None]) -> str | None:
             return f"https://github.com/user-attachments/assets/{uuid.UUID(name.partition('-')[2])}"
         except ValueError:
             return None
-    return src
+    return url.strip()
+
+
+def _media_path(url: str) -> str:
+    """The lower-case path of the file behind `url`. A camo address carries the original address in hex."""
+    parts = urlsplit(url)
+    if parts.netloc == "camo.githubusercontent.com":
+        try:
+            return urlsplit(bytes.fromhex(parts.path.rsplit("/", 1)[-1]).decode()).path.lower()
+        except ValueError:
+            return parts.path.lower()
+    return parts.path.lower()
+
+
+def card_media(tag: str, attrs: dict[str, str | None]) -> CardMedia | None:
+    """The image or video that a tag shows, or None for icons, badges, emoji and other tags.
+
+    Limit: a GitHub video attachment link without a file suffix counts as a plain link, because its type is
+    only known after a request. Revisit if release notes with such videos show no video on the card.
+    """
+    if tag == "img":
+        source = attrs.get("src") or ""
+        if "badge" in source.lower() or "emoji" in (attrs.get("class") or ""):
+            return None
+        if any(size and size.isdigit() and int(size) < 64 for size in (attrs.get("width"), attrs.get("height"))):
+            return None
+    elif tag in {"video", "source"}:
+        source = attrs.get("src") or ""
+    elif tag == "a":
+        source = attrs.get("href") or ""
+        if not _media_path(source).endswith(VIDEO_SUFFIXES):
+            return None
+    else:
+        return None
+    url = _lasting_url(source)
+    if url is None:
+        return None
+    path = _media_path(url)
+    if path.endswith(".svg"):
+        return None
+    if tag != "img" or path.endswith(VIDEO_SUFFIXES):
+        return CardMedia(url, "video")
+    return CardMedia(url, "gif" if path.endswith(".gif") else "image")
 
 
 class _ExcerptParser(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
         self.root = _Element("root")
-        self.image_urls: list[str] = []
+        self.media: list[CardMedia] = []
         self._open: list[_Element] = [self.root]
         self._dropped: list[str] = []
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag == "img" and len(self.image_urls) < MAX_CARD_IMAGES:
-            image = card_image_url(dict(attrs))
-            if image and image not in self.image_urls:
-                self.image_urls.append(image)
+        if len(self.media) < MAX_CARD_MEDIA:
+            found = card_media(tag, dict(attrs))
+            if found and all(found.url != known.url for known in self.media):
+                self.media.append(found)
         if self._dropped or tag in EXCERPT_DROP_TAGS:
             if tag not in VOID_TAGS:
                 self._dropped.append(tag)
@@ -249,7 +293,7 @@ def _is_ignored_excerpt_block(tag: str, text: str, profile: EnrichmentProfile) -
 
 
 def html_excerpt(value: str, profile: EnrichmentProfile, budget: int = EXCERPT_TEXT_BUDGET) -> Excerpt:
-    """The first blocks of an HTML body with their formatting, and the images that suit card pictures."""
+    """The first blocks of an HTML body with their formatting, and the images and videos for the card."""
     parser = _ExcerptParser()
     parser.feed(value)
     parser.close()
@@ -284,7 +328,7 @@ def html_excerpt(value: str, profile: EnrichmentProfile, budget: int = EXCERPT_T
         used += len(text)
     if cut:
         parts.append("<p>…</p>")
-    return Excerpt(html="".join(parts), image_urls=tuple(parser.image_urls))
+    return Excerpt(html="".join(parts), media=tuple(parser.media))
 
 
 def is_html(value: str) -> bool:
@@ -503,5 +547,5 @@ def enrich_change(
         content=display_content,
         quality_flags=flags,
         profile=profile.name,
-        image_urls=excerpt.image_urls if excerpt else (),
+        media=excerpt.media if excerpt else (),
     )

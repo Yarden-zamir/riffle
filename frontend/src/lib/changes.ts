@@ -54,6 +54,20 @@ export function renderedHtml(value: string) {
   return DOMPurify.sanitize(parsed);
 }
 
+export type CardMedia = { url: string; kind: "image" | "gif" | "video"; /** The position in `metadata.media`, which the media route takes. */ index: number };
+
+/** The images, GIFs and videos of a card, from `metadata.media`. Entries with an unsafe address or an unknown kind are left out. */
+export function cardMedia(change: Change): CardMedia[] {
+  const media = change.metadata?.media;
+  if (!Array.isArray(media)) return [];
+  return media.flatMap((item: unknown, index) => {
+    if (typeof item !== "object" || item === null) return [];
+    const { url, kind } = item as Record<string, unknown>;
+    const safe = typeof url === "string" ? safeUrl(url) : null;
+    return safe && (kind === "image" || kind === "gif" || kind === "video") ? [{ url: safe, kind, index }] : [];
+  });
+}
+
 export function safeUrl(value: string | null) {
   if (!value) return null;
   try {

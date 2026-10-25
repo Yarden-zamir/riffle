@@ -61,14 +61,19 @@ def test_short_posts_show_whole_and_drop_details_and_unsafe_markup() -> None:
     assert content == "<p>Intro <a>link</a></p><ul><li>One</li></ul>"
 
 
-def test_card_images_are_the_real_images_in_post_order_with_lasting_addresses() -> None:
+def test_card_media_lists_images_gifs_and_videos_in_post_order_with_lasting_addresses() -> None:
     signed = ("https://private-user-images.githubusercontent.com/8178413/683589296-4651da5d-5013-45cf-8999-2eed4b6be37b.png"
               "?jwt=expires-in-300-seconds")
+    gif = "https://camo.githubusercontent.com/digest/" + "https://files.example.org/search.gif".encode().hex()
     body = ("<p><img src=\"https://img.shields.io/badge/build-passing-green.svg\"><img class=\"emoji\" src=\"https://example.com/e.png\"></p>"
             f"<details><summary>Screenshots</summary><img src=\"{signed}\"><img src=\"{signed}\"></details>"
-            "<p>Text <img src=\"https://example.com/second.png\"></p>")
+            f"<p>Text <img src=\"{gif}\"> <a href=\"https://example.com/demo.mp4\">demo</a></p>")
 
     enriched = enrich(body)
 
-    assert enriched.image_urls == ("https://github.com/user-attachments/assets/4651da5d-5013-45cf-8999-2eed4b6be37b", "https://example.com/second.png")
+    assert [(item.url, item.kind) for item in enriched.media] == [
+        ("https://github.com/user-attachments/assets/4651da5d-5013-45cf-8999-2eed4b6be37b", "image"),
+        (gif, "gif"),
+        ("https://example.com/demo.mp4", "video"),
+    ]
     assert "<img" not in enriched.content
