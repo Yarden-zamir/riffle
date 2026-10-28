@@ -66,34 +66,17 @@ services:
       KITSHN_DEPLOYMENT: ${KITSHN_DEPLOYMENT}
     expose:
       - "4180"
-    # The distroless image has no probe tools. The auth socket proxy checks its HTTP endpoint instead.
+    # The distroless image has no probe tools, so this service has no health check.
     restart: unless-stopped
 
-  auth-socket-proxy:
-    profiles: [github-auth]
-    image: alpine/socat:latest
-    pull_policy: always
-    command: ["UNIX-LISTEN:${KITSHN_SOCKET_DIR}/auth.sock,fork,unlink-early,mode=666", "TCP:oauth2-proxy:4180"]
+  # kitshn 2 sends every request to the default socket. The router does what the KitSHn 1 host Caddy did.
+  router:
+    build: ./router
+    pull_policy: build
+    environment:
+      KITSHN_DEFAULT_SOCKET: ${KITSHN_DEFAULT_SOCKET}
     volumes:
       - ${KITSHN_SOCKET_DIR}:${KITSHN_SOCKET_DIR}
-    depends_on:
-      oauth2-proxy:
-        condition: service_started
-    healthcheck:
-      test: ["CMD-SHELL", "test -S '${KITSHN_SOCKET_DIR}/auth.sock' && wget -q -O /dev/null http://oauth2-proxy:4180/ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    restart: unless-stopped
-
-  socket-proxy:
-    image: alpine/socat:latest
-    pull_policy: always
-    command: ["UNIX-LISTEN:${KITSHN_DEFAULT_SOCKET},fork,unlink-early,mode=666", "TCP:app:8000"]
-    volumes:
-      - ${KITSHN_SOCKET_DIR}:${KITSHN_SOCKET_DIR}
-    networks:
-      - default
     depends_on:
       app:
         condition: service_healthy
@@ -102,3 +85,4 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
