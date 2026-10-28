@@ -423,6 +423,8 @@ def upsert_changes(
             raise KeyError(f"source {source_id} not found")
         fetched_at = utc_now()
         for change in changes:
+            # An undated change carries its fetch time. Keep the time of the first fetch, so the card does not move.
+            undated = change.metadata.get("undated") is True
             connection.execute(
                 """
                 INSERT INTO changes (source_id, external_id, title, url, summary, content, published_at, fetched_at, metadata)
@@ -432,6 +434,10 @@ def upsert_changes(
                     content = excluded.content,
                     published_at = CASE WHEN ? THEN changes.published_at ELSE excluded.published_at END,
                     fetched_at = excluded.fetched_at, metadata = excluded.metadata
+                -- DuckDB writes a new row version for each update, and refreshes return mostly unchanged items.
+                WHERE (changes.title, changes.url, changes.summary, changes.content, changes.metadata::VARCHAR)
+                    IS DISTINCT FROM (excluded.title, excluded.url, excluded.summary, excluded.content, excluded.metadata::VARCHAR)
+                    OR (NOT ? AND changes.published_at IS DISTINCT FROM excluded.published_at)
             """,
                 [
                     change.external_id or _fallback_external_id(source_id, change),
@@ -444,8 +450,8 @@ def upsert_changes(
                     _json(change.metadata),
                     source_id,
                     owner_id,
-                    # An undated change carries its fetch time. Keep the time of the first fetch, so the card does not move.
-                    change.metadata.get("undated") is True,
+                    undated,
+                    undated,
                 ],
             )
 

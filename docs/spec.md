@@ -73,6 +73,7 @@ Behavior:
 - Changes dedupe by `(source_id, external_id)`.
 - If a plugin does not provide `external_id`, Riffle derives one from source ID, URL, title, and publication time.
 - A refresh updates known changes: title, URL, text, publication time, fetched time, and metadata. A change with `metadata.undated: true` keeps the publication time of its first fetch.
+- A refresh does not write a known change that has no new values. Its fetched time stays the time of its last write. DuckDB writes a new row version for each update.
 - A refresh preserves `dismissed`, `saved`, `note`, and `state_updated_at`.
 - The backend owns this private state. Browser `localStorage` is not the state store.
 - Feed windows filter results. They do not expire or delete data.

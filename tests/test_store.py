@@ -1,5 +1,7 @@
 from datetime import datetime, timezone
 
+import duckdb
+
 from riffle.models import ChangeInput, ChangeUpdate, SourceCreate, TimeWindow
 from riffle.store import (
     add_source,
@@ -82,6 +84,26 @@ def test_upsert_changes_deduplicates_by_external_id(tmp_path) -> None:
 
     assert len(changes) == 1
     assert changes[0].title == "New"
+
+
+def test_refetch_of_unchanged_changes_stores_no_new_rows(tmp_path) -> None:
+    db_path = tmp_path / "riffle.duckdb"
+    source = add_source(SourceCreate(name="Feed", config={"url": "https://example.com/feed.xml"}), db_path)
+    published_at = datetime(2026, 7, 4, 10, tzinfo=timezone.utc)
+
+    for hour in range(3):
+        # An undated change carries a new fetch time on each fetch.
+        fetched_at = published_at.replace(hour=hour)
+        upsert_changes(source.id, [
+            ChangeInput(external_id="dated", title="Dated", content="<p>Body</p>", published_at=published_at, metadata={"a": 1}),
+            ChangeInput(external_id="undated", title="Undated", published_at=fetched_at, metadata={"undated": True}),
+        ], db_path)
+
+    with duckdb.connect(str(db_path), read_only=True) as connection:
+        stored = connection.execute(
+            "SELECT max(start + count) FROM pragma_storage_info('changes') WHERE column_name = 'id'"
+        ).fetchone()
+    assert stored == (2,)
 
 
 def test_update_change_state_survives_upsert(tmp_path) -> None:
