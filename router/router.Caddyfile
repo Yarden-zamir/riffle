@@ -1,0 +1,37 @@
+{
+	auto_https off
+	admin off
+}
+
+http:// {
+	bind unix/{$KITSHN_DEFAULT_SOCKET}|0666
+
+	# A client never sets the identity or the forwarded headers; the app and oauth2-proxy read them.
+	request_header -Remote-User
+	request_header -X-Auth-Request-*
+	request_header -X-Forwarded-*
+
+	handle /auth/* {
+		# Agent tokens reach the app only. oauth2-proxy never receives client Authorization headers.
+		request_header -Authorization
+		reverse_proxy oauth2-proxy:4180 {
+			# cloudflared reaches this Caddy over a socket, so the client address is Cloudflare's header.
+			header_up X-Real-IP {http.request.header.Cf-Connecting-Ip}
+			header_up X-Forwarded-For {http.request.header.Cf-Connecting-Ip}
+			header_up X-Forwarded-Proto https
+			header_up X-Forwarded-Uri {uri}
+			# The API reads these headers internally. Never expose the GitHub token to the browser.
+			header_down -X-Auth-Request-*
+			header_down -X-Forwarded-Access-Token
+			header_down -Authorization
+		}
+	}
+
+	handle {
+		reverse_proxy app:8000 {
+			header_up X-Real-IP {http.request.header.Cf-Connecting-Ip}
+			header_up X-Forwarded-For {http.request.header.Cf-Connecting-Ip}
+			header_up X-Forwarded-Proto https
+		}
+	}
+}
