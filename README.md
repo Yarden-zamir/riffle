@@ -1,6 +1,6 @@
 # Riffle
 
-[![kitshn](https://kitshn.yarden-zamir.com/b/Yarden-zamir/riffle.svg)](https://riffle.yarden-zamir.com)
+[![kitshn](https://kit.yarden-zamir.com/public/badges/Yarden-zamir/riffle.svg)](https://riffle.yarden-zamir.com)
 
 Paste a news site without RSS, such as Reuters, into source discovery to follow its Google News sitemap with the `news-sitemap` plugin. Discovery finds the sitemap in the site's robots.txt.
 
