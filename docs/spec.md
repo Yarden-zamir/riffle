@@ -509,7 +509,7 @@ Query parameters:
 - The app never treats public identity headers as authentication. [User Data](user-data.md) defines the identity checks and token rules.
 - Data survives restarts and deploys. No automatic expiry applies to profiles, sources, changes, or state, including anonymous data.
 - Feed and refresh windows limit selection, not retention.
-- [KitSHn Recipe](../kitshn.md) describes deployment configuration. This spec does not certify a deployment or test result.
+- [kitshn](../kitshn.md) describes the deployment. This spec does not certify a deployment or test result.
 
 ## Non-Goals For This Version
 
