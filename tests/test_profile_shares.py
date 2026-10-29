@@ -20,7 +20,10 @@ def api_client(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Test
     monkeypatch.setenv("RIFFLE_MANUAL_GENERATE_API", "false")
     monkeypatch.setenv("RIFFLE_CORS_ORIGINS", "http://localhost:5173")
     monkeypatch.setenv("RIFFLE_PUBLIC_ORIGIN", "https://changes.example.com")
-    with TestClient(create_app()) as client:
+    dist = tmp_path / "frontend"
+    dist.mkdir()
+    (dist / "index.html").write_text('<html><head><title>Riffle</title></head><body><div id="root"></div></body></html>')
+    with TestClient(create_app(frontend_dist=dist)) as client:
         yield client
 
 
@@ -56,9 +59,14 @@ def test_share_link_follows_the_profile_until_it_stops(api_client: TestClient) -
     renamed = api_client.patch("/profiles/dev", headers=headers, json={"name": "tools"})
     assert renamed.json()["share_token"] == token
     assert api_client.get(f"/shares/{token}").json()["name"] == "tools"
+    assert "tools desk on Riffle" in api_client.get(f"/share/{token}").text
 
     assert api_client.delete(f"/shares/{token}", headers=headers).status_code == 204
     assert api_client.get(f"/shares/{token}").status_code == 404
+    revoked_page = api_client.get(f"/share/{token}")
+    assert revoked_page.status_code == 200
+    assert '<meta property="og:title" content="Riffle"' in revoked_page.text
+    assert "tools desk" not in revoked_page.text
     assert api_client.get("/profiles", headers=headers).json()[0]["share_token"] is None
 
 
@@ -89,6 +97,9 @@ def test_shared_profile_is_public_and_shows_only_enabled_sources_and_declared_se
         ],
     }
     assert owner not in response.text
+    page = api_client.get(f"/share/{token}")
+    assert "1 source. Import them into your own Riffle feed." in page.text
+    assert all(value not in page.text for value in (owner, "kept home", "Paused", "Other desk"))
     assert api_client.get("/shares/unknown-token").status_code == 404
 
 

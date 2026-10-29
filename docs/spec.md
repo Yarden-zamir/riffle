@@ -342,7 +342,7 @@ Additional routes:
 - `POST /agent/device`, `POST /agent/token`, `DELETE /agent/token`, `GET /agent/device/{user_code}`, `POST /agent/device/{user_code}/approve`, `POST /agent/device/{user_code}/deny`, `GET /agent/tokens`, and `DELETE /agent/tokens/{id}`: [Agent Access](user-data.md#agent-access).
 - `GET /connect`: The frontend page for agent approval.
 - `POST /shares`, `DELETE /shares/{token}`, `GET /shares/{token}`, and `POST /shares/{token}/import`: [Profile Sharing](user-data.md#profile-sharing).
-- `GET /share/{token}`: The frontend page for a shared profile.
+- `GET /share/{token}`: The frontend page for a shared profile, with HTML-escaped title, description, Open Graph, and Twitter summary-card metadata from the public share projection. Unknown or revoked tokens get generic Riffle metadata and the normal page shell; their share API reads still return `404`.
 
 Behavior:
 
@@ -380,7 +380,7 @@ Behavior:
 
 - Loads cached changes from the backend.
 - Lists the owner's profiles, including empty profiles, and permits profile creation, rename, deletion, and share links.
-- The `/share/{token}` page shows a shared profile and imports it on an explicit click: [Shared Profiles](../frontend/API.md#shared-profiles).
+- The `/share/{token}` page shows a shared profile and imports it on an explicit click. The import form and button precede a source list that starts collapsed, with a count such as `Show 44 sources`. It shows no sample headlines: shares exclude changes. [Shared Profiles](../frontend/API.md#shared-profiles) defines the page and its server-rendered preview metadata.
 - Reads durable backend data. The server refreshes enabled sources hourly with a default 30-day fetch window.
 - Supports source search, discovery, preview, creation, edit, enable, disable, draft duplication, confirmed deletion, and explicit refresh.
 - One source search input matches names against saved sources and optional catalog suggestions. It does not search the full web.
