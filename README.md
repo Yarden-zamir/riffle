@@ -106,7 +106,7 @@ The proxy accepts any GitHub user; inbound identity headers never establish an a
 Previews default to authentication disabled and need no OAuth credentials.
 The API origin is configurable through `RIFFLE_PUBLIC_ORIGIN`.
 `RIFFLE_CORS_ORIGINS` defaults to `http://localhost:5173,http://127.0.0.1:5173` for development. The deployment default is `https://news.yarden-zamir.com,https://the-riffle.yarden-zamir.com`, the two hosts of the news site that syncs reader state.
-See [KitSHn prerequisites and auth contract](kitshn.md) for production parameters, callback setup, and preview isolation.
+See [kitshn deploy and auth notes](kitshn.md) for production parameters, callback setup, and preview isolation.
 
 ## Agent Access
 
