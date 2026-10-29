@@ -3,6 +3,8 @@ services:
     build: .
     # One process owns DuckDB. Revisit storage before any replica or worker increase.
     scale: 1
+    # A restart of Docker or of the machine starts the app again, as the router and oauth2-proxy do.
+    restart: unless-stopped
     environment:
       KITSHN_RECIPE: ${KITSHN_RECIPE}
       KITSHN_ENVIRONMENT: ${KITSHN_ENVIRONMENT}
