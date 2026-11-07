@@ -115,7 +115,7 @@ type PreviewChange = Pick<Change,
 >;
 ```
 
-`Change.content` can hold an HTML excerpt of the post. The client sanitizes it before it renders. `Change.metadata.media`, when present, lists `{ url, kind }` items in post order, where `kind` is `image`, `gif` or `video`. The card shows them in a row that scrolls sideways, and hides an item that does not load. `GET /changes/{id}/media/{index}` returns the bytes of a GIF item, for the scrubber.
+`Change.content` can hold an HTML excerpt of the post. The client sanitizes it before it renders. `Change.metadata.media`, when present, lists `{ url, kind }` items in post order. Every source plugin can fill it, where `kind` is `image`, `gif` or `video`. The card shows them in a row that scrolls sideways, and hides an item that does not load. `GET /changes/{id}/media/{index}` returns the bytes of a GIF item, for the scrubber.
 
 Dates use ISO strings. Required text fields use empty strings rather than `null`.
 Feed windows use `24h`, `7d`, `30d`, `90d`, or `365d`.
@@ -313,7 +313,7 @@ Account changes discard these local edits. They do not replace durable server st
 17. Empty-desk status uses a one-line message in the existing queue header, not a duplicate panel. It distinguishes load progress, error, no active sources, shelved items, cleared items, and no unread items.
 18. Empty-desk guidance uses source management, restore, or the existing Window control. Account setup remains separate from the empty queue message.
 
-The header exposes account/import actions through the GitHub icon menu. The Sources count opens the editor, and Cleared opens the scoped cleared-item list with individual and batch restore controls. An empty shelf uses only its compact header.
+The header exposes account/import actions through the GitHub icon menu. The Sources count opens the editor, and Cleared opens the scoped cleared-item list with individual and batch restore controls. On small screens, the counts sit in a header menu left of the GitHub menu. An empty shelf is hidden.
 
 ## Discard Boundaries
 
