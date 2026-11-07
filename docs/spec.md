@@ -266,6 +266,9 @@ Behavior:
 - The excerpt shows about 1,500 characters of text. It cuts between whole blocks or whole list items, and it ends with `…` after a cut.
 - A body from a fetched linked page gets no excerpt. Its card shows the compacted summary.
 - `metadata.media` lists the images, GIFs and videos of the entry body for the card, in post order, without repeats, and at most 12. Each entry has `url` and `kind` (`image`, `gif` or `video`). Icons, badges, emoji and SVG files do not count. A signed GitHub attachment link becomes its lasting `github.com/user-attachments/assets/<id>` address, because the signed link expires after 300 seconds.
+- Body images also count when their address is relative or lazy-loaded (`data-src`, `srcset`). A relative address resolves against the entry link.
+- Media that the feed attaches (`media:content` and image or video enclosures) follow the body media. A `media:thumbnail`, or the share image of a fetched linked page, shows only when the entry has no other media.
+- HTML news cards take the Open Graph or Twitter card image or video of the article. X cards take the photos of the post, and the best MP4 of a video or GIF. News sitemap cards take the image sitemap pictures of the article.
 - A video comes from a `<video>` or `<source>` tag, or from a link to an `.mp4`, `.webm`, `.mov` or `.m4v` file. A GIF is an image whose file ends in `.gif`, also behind a camo address.
 - A card shows its media in a row that scrolls sideways. A click opens a full-screen viewer: zoom with buttons, the mouse wheel, a pinch or a double click, drag to pan, and move between items with the arrow buttons or keys. The viewer links to the original.
 - In the viewer, a video or a GIF has a play button and a scrubber. Space plays or pauses, and `,` and `.` step back and forward. A GIF scrubber decodes the frames in the browser (`ImageDecoder`). Without `ImageDecoder`, the GIF plays without a scrubber.
@@ -448,22 +451,25 @@ Behavior:
 - During the 240ms exit, the card's layout space and queue gap collapse with the same easing, moving the following card into place continuously.
 - At animation completion the queue updates optimistically, without waiting for the server. Other cards remain usable while writes finish serially in the background.
 - Failed writes restore the failed and unsent optimistic changes, cancel unsent jobs, and require an explicit reload. Acknowledged changes remain saved. Undo waits until queued writes finish.
-- Desktop cards place Clear or Mark read at the top right, independent of content height. Mobile cards retain bottom action controls.
+- Desktop cards place Clear or Mark read at the top right, independent of content height. Mobile cards keep a bottom action bar.
+- Below the medium breakpoint, cards show no Clear, Mark read, or Shelf button, because swipes do those actions.
+- Open source is an icon button at all sizes.
 - When a card leaves a queue, the card after it takes its place in the viewport. Shelving does not move the viewport even though the shelf above grows.
 - Keyboard: `j`/`k` or arrow keys move the current card, `x` clears or marks read, `s` shelves or unshelves, `o` or Enter opens the source, `n` toggles the note, `z` undoes. Keys are ignored while typing.
 - Every clear, shelf, and unshelf shows an undo toast for a few seconds.
 - Press `?` or select Keyboard shortcuts to open shortcut help. Press `?` or Escape to close it. Help blocks card shortcuts.
 - Additional shortcuts: `u` undoes, `r` restores cleared items, `f` filters to the current source, and `a` shows all sources.
 - Press `e` to open the source editor. The editor blocks feed shortcuts.
-- Press `p`, `w`, or `t` to focus the profile, window, or order control. Native form keys control the selection.
+- Press `p`, `w`, or `t` to focus the profile, window, or order control. On small screens, the key first opens the controls menu. Native form keys control the selection.
 - Enter preserves native button and link activation. Held action keys do not repeat; card navigation keys repeat.
 - The control panel offers Restore when loaded dismissed entries exist. Restore covers only the loaded profile, window, and active source filter, up to 200 items.
 - Without a source filter, Restore covers loaded dismissed entries across the profile. It preserves notes and shelf flags; it never restores unloaded entries.
 - The note control is an arrow that expands a text box on the card. Saving a note from the desk shelves the entry. Cmd/Ctrl+Enter saves, Escape closes.
-- An empty shelf shows only its compact header. An empty desk uses a one-line message in its header, without a duplicate panel.
+- An empty shelf is hidden. An empty desk uses a one-line message in its header, without a duplicate panel.
 - The desk header distinguishes feed load in progress, load error, no active sources, items on the shelf, cleared items, and no unread items.
 - Empty-desk guidance points to source management, restore, or the existing Window control as appropriate. Account setup remains separate.
-- Below the large breakpoint, the control panel has a compact stats strip, a full-width profile selector, and a two-column window/order row. Dropdown labels omit redundant counts and captions.
+- Below the large breakpoint, two buttons left of the GitHub menu replace the control panel. The first shows the desk count and opens all counts. The second opens the profile, window, and order controls.
+- Below the large breakpoint, an active source filter shows above the desk. Dropdown labels omit redundant counts and captions.
 - Clicking Sources opens the source/profile editor. Clicking Cleared opens the loaded cleared-item list with individual restore and restore-all controls. Restore is absent from the main view.
 - The main header contains the title and GitHub menu, without a subtitle or account explanation. Populated queue headers omit repeated explanatory text. Source filter names wrap.
 - At 320px and wider, long card titles, source names, notes, and account names wrap without page-level horizontal overflow.

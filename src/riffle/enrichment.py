@@ -4,8 +4,8 @@ import html as html_lib
 import uuid
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
-from typing import Callable, Literal
-from urllib.parse import urlsplit
+from typing import Callable, Iterable, Literal
+from urllib.parse import urljoin, urlsplit
 
 
 GENERIC_SUMMARY_PHRASES = (
@@ -182,40 +182,84 @@ def _media_path(url: str) -> str:
     return parts.path.lower()
 
 
-def card_media(tag: str, attrs: dict[str, str | None]) -> CardMedia | None:
+def media_from_url(url: str, *, base_url: str | None = None, hint: str = "") -> CardMedia | None:
+    """The card media at `url`, or None for a link that is no web address or an SVG file.
+
+    `hint` is a MIME type or a media word such as `video`, from a feed or a page. Without one, the file suffix
+    decides. A relative `url` resolves against `base_url`.
+    """
+    resolved = _lasting_url(urljoin(base_url, url.strip()) if base_url else url)
+    if resolved is None:
+        return None
+    path = _media_path(resolved)
+    hint = hint.lower()
+    if path.endswith(".svg") or hint.startswith("image/svg"):
+        return None
+    if hint.startswith("video") or path.endswith(VIDEO_SUFFIXES):
+        return CardMedia(resolved, "video")
+    if hint.startswith(("audio", "application", "text")):
+        return None
+    return CardMedia(resolved, "gif" if path.endswith(".gif") or hint == "image/gif" else "image")
+
+
+def merge_media(*groups: Iterable[CardMedia | None]) -> tuple[CardMedia, ...]:
+    """The media of all groups in order, without repeats, and at most `MAX_CARD_MEDIA`."""
+    merged: list[CardMedia] = []
+    for item in (item for group in groups for item in group):
+        if item and all(item.url != known.url for known in merged):
+            merged.append(item)
+            if len(merged) == MAX_CARD_MEDIA:
+                break
+    return tuple(merged)
+
+
+def media_metadata(media: tuple[CardMedia, ...]) -> dict[str, list[dict[str, str]]]:
+    """The `metadata.media` field of a change. A change without media gets no field."""
+    return {"media": [{"url": item.url, "kind": item.kind} for item in media]} if media else {}
+
+
+def _image_source(attrs: dict[str, str | None]) -> str:
+    """The address of an `img`. Lazy-loading pages keep it in `data-src` and put a placeholder in `src`."""
+    source = attrs.get("src") or ""
+    if source and not source.startswith("data:"):
+        return source
+    for key in ("data-src", "data-lazy-src", "data-original"):
+        if attrs.get(key):
+            return attrs[key] or ""
+    # A srcset lists "address width" pairs. The first address is enough for a card.
+    return (attrs.get("srcset") or attrs.get("data-srcset") or "").strip().split(" ", 1)[0].rstrip(",")
+
+
+def card_media(tag: str, attrs: dict[str, str | None], base_url: str | None = None) -> CardMedia | None:
     """The image or video that a tag shows, or None for icons, badges, emoji and other tags.
 
     Limit: a GitHub video attachment link without a file suffix counts as a plain link, because its type is
     only known after a request. Revisit if release notes with such videos show no video on the card.
     """
     if tag == "img":
-        source = attrs.get("src") or ""
+        source = _image_source(attrs)
         if "badge" in source.lower() or "emoji" in (attrs.get("class") or ""):
             return None
         if any(size and size.isdigit() and int(size) < 64 for size in (attrs.get("width"), attrs.get("height"))):
             return None
-    elif tag in {"video", "source"}:
-        source = attrs.get("src") or ""
-    elif tag == "a":
-        source = attrs.get("href") or ""
-        if not _media_path(source).endswith(VIDEO_SUFFIXES):
+        return media_from_url(source, base_url=base_url) if source else None
+    if tag in {"video", "source"}:
+        # A `source` inside `picture` is an image variant. The `img` of the same `picture` already counts.
+        if (attrs.get("type") or "").startswith("image/"):
             return None
-    else:
-        return None
-    url = _lasting_url(source)
-    if url is None:
-        return None
-    path = _media_path(url)
-    if path.endswith(".svg"):
-        return None
-    if tag != "img" or path.endswith(VIDEO_SUFFIXES):
-        return CardMedia(url, "video")
-    return CardMedia(url, "gif" if path.endswith(".gif") else "image")
+        source = attrs.get("src") or ""
+        return media_from_url(source, base_url=base_url, hint="video") if source else None
+    if tag == "a":
+        source = attrs.get("href") or ""
+        found = media_from_url(source, base_url=base_url) if source else None
+        return found if found and found.kind == "video" else None
+    return None
 
 
 class _ExcerptParser(HTMLParser):
-    def __init__(self) -> None:
+    def __init__(self, base_url: str | None) -> None:
         super().__init__(convert_charrefs=True)
+        self.base_url = base_url
         self.root = _Element("root")
         self.media: list[CardMedia] = []
         self._open: list[_Element] = [self.root]
@@ -223,7 +267,7 @@ class _ExcerptParser(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if len(self.media) < MAX_CARD_MEDIA:
-            found = card_media(tag, dict(attrs))
+            found = card_media(tag, dict(attrs), self.base_url)
             if found and all(found.url != known.url for known in self.media):
                 self.media.append(found)
         if self._dropped or tag in EXCERPT_DROP_TAGS:
@@ -292,9 +336,12 @@ def _is_ignored_excerpt_block(tag: str, text: str, profile: EnrichmentProfile) -
     return is_ignored_release_note_line(tag, text, profile)
 
 
-def html_excerpt(value: str, profile: EnrichmentProfile, budget: int = EXCERPT_TEXT_BUDGET) -> Excerpt:
-    """The first blocks of an HTML body with their formatting, and the images and videos for the card."""
-    parser = _ExcerptParser()
+def html_excerpt(value: str, profile: EnrichmentProfile, budget: int = EXCERPT_TEXT_BUDGET, base_url: str | None = None) -> Excerpt:
+    """The first blocks of an HTML body with their formatting, and the images and videos for the card.
+
+    Relative media addresses resolve against `base_url`.
+    """
+    parser = _ExcerptParser(base_url)
     parser.feed(value)
     parser.close()
     parts: list[str] = []
@@ -329,6 +376,36 @@ def html_excerpt(value: str, profile: EnrichmentProfile, budget: int = EXCERPT_T
     if cut:
         parts.append("<p>…</p>")
     return Excerpt(html="".join(parts), media=tuple(parser.media))
+
+
+class _PageImageParser(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__()
+        self.images: list[tuple[str, str]] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag != "meta":
+            return
+        data = dict(attrs)
+        key = (data.get("property") or data.get("name") or "").lower()
+        content = data.get("content")
+        if content and key in PAGE_IMAGE_KEYS:
+            self.images.append((key, content))
+
+
+# The share images that a page declares for link previews. A video key comes before the images of the same page.
+PAGE_IMAGE_KEYS = ("og:video", "og:video:url", "og:video:secure_url", "og:image", "og:image:url", "og:image:secure_url", "twitter:image", "twitter:image:src")
+
+
+def page_media(html: str, base_url: str) -> tuple[CardMedia, ...]:
+    """The Open Graph and Twitter card images and videos of a web page, which a link preview shows."""
+    parser = _PageImageParser()
+    parser.feed(html)
+    parser.close()
+    return merge_media(
+        media_from_url(url, base_url=base_url, hint="video" if "video" in key else "")
+        for key, url in sorted(parser.images, key=lambda item: PAGE_IMAGE_KEYS.index(item[0]))
+    )
 
 
 def is_html(value: str) -> bool:
@@ -510,10 +587,17 @@ def enrich_change(
     feed_title: str,
     profile: EnrichmentProfile,
     fetch_link: Callable[[str], str | None] | None = None,
+    feed_media: Iterable[CardMedia | None] = (),
+    thumbnails: Iterable[CardMedia | None] = (),
 ) -> EnrichmentResult:
+    """`feed_media` are media that the feed attaches to the entry. They follow the media of the body.
+
+    `thumbnails` and the share image of a fetched linked page show only when the entry has no other media,
+    because they usually repeat a body image in a smaller size.
+    """
     flags = classify_quality(title, summary, content)
     body = content or summary
-    excerpt = html_excerpt(body, profile) if is_html(body) else None
+    excerpt = html_excerpt(body, profile, base_url=url) if is_html(body) else None
     linked_body: str | None = None
 
     if url and fetch_link and profile.fetch_link_when.intersection(flags):
@@ -547,5 +631,6 @@ def enrich_change(
         content=display_content,
         quality_flags=flags,
         profile=profile.name,
-        media=excerpt.media if excerpt else (),
+        media=merge_media(excerpt.media if excerpt else (), feed_media)
+        or merge_media(thumbnails, page_media(linked_body, url) if linked_body and url else ()),
     )

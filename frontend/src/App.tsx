@@ -1,13 +1,16 @@
-import { BookmarkCheck, CalendarDays, Inbox, LibraryBig, Newspaper, Undo2 } from "lucide-react";
+import { BookmarkCheck, CalendarDays, Inbox, LibraryBig, Newspaper, SlidersHorizontal, Undo2 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 import { ChangeCard } from "./components/ChangeCard";
 import { ErrorNote } from "./components/ErrorNote";
+import { HeaderMenu } from "./components/HeaderMenu";
 import { AccountArea } from "./components/AccountArea";
 import { SourceEditor } from "./components/SourceEditor";
 import { Badge } from "./components/ui/badge";
 import { interactionHaptic } from "./lib/haptics";
 import { anonymousTokenKey, api, ApiError, clearReadCache, errorMessage, getIdentity, identityInvalidatedEvent, invalidateIdentity, resetSession, type Identity, type Profile } from "./lib/api";
+import { useMediaQuery } from "./lib/useMediaQuery";
 import { changeKey, dateValue, openChange, type CardLocation, type Change, type ViewChange } from "./lib/changes";
 
 type UserChangeState = {
@@ -200,6 +203,7 @@ export default function App() {
   const resetLock = useRef(false);
   const [revision, setRevision] = useState(0);
   const [editorOpen, setEditorOpen] = useState(false);
+  const [headerSlot, setHeaderSlot] = useState<HTMLDivElement | null>(null);
   const request = useRef(0);
   const profileRequest = useRef(0);
   const refreshProfiles = useRef(true);
@@ -302,8 +306,8 @@ export default function App() {
 
   return <div className="min-h-screen px-1 py-2 text-ink sm:px-5 sm:py-4 lg:px-8">
     {identity ? <>
-      <AccountArea key={`${identity.id}:${identity.authenticated}`} identity={identity} onReload={() => reload()} onEdit={() => setEditorOpen(true)} />
-      <Feed key={`${identity.id}:${identity.authenticated}`} owner={identity.id} profiles={profiles} revision={revision} onEdit={() => setEditorOpen(true)} />
+      <AccountArea key={`account:${identity.id}:${identity.authenticated}`} identity={identity} onReload={() => reload()} onEdit={() => setEditorOpen(true)} slotRef={setHeaderSlot} />
+      <Feed key={`feed:${identity.id}:${identity.authenticated}`} owner={identity.id} profiles={profiles} revision={revision} headerSlot={headerSlot} onEdit={() => setEditorOpen(true)} />
       {editorOpen ? <SourceEditor key={identity.id} owner={identity.id} profiles={profiles} onChanged={async () => {
         const ticket = ++profileRequest.current;
         const loaded = await api<Profile[]>("/profiles", { owner: identity.id });
@@ -336,7 +340,8 @@ export default function App() {
   </div>;
 }
 
-function Feed({ owner, profiles, revision, onEdit }: { owner: string; profiles: Profile[]; revision: number; onEdit: () => void }) {
+function Feed({ owner, profiles, revision, headerSlot, onEdit }: { owner: string; profiles: Profile[]; revision: number; headerSlot: HTMLElement | null; onEdit: () => void }) {
+  const wide = useMediaQuery("(min-width: 64rem)");
   const [changes, setChanges] = useState<Change[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [urlState, setUrlState] = useState<UrlState>(readUrlState);
@@ -652,7 +657,11 @@ function Feed({ owner, profiles, revision, onEdit }: { owner: string; profiles: 
       const controlId = controlIds[event.key];
       if (controlId) {
         event.preventDefault();
-        document.getElementById(controlId)?.focus();
+        const control = document.getElementById(controlId);
+        // On small screens the control sits in a closed header menu.
+        const menu = control?.closest("details");
+        if (menu) menu.open = true;
+        control?.focus();
         return;
       }
       if (event.key === "r") {
@@ -724,63 +733,51 @@ function Feed({ owner, profiles, revision, onEdit }: { owner: string; profiles: 
     },
   });
 
+  const controlProps: ControlProps = {
+    queueCount: deskChanges.length,
+    dismissedCount,
+    feedWindow,
+    onClearSourceFilter: () => updateUrlState({ sourceId: null, sourceName: null }),
+    onFeedWindowChange: (nextFeedWindow) => updateUrlState({ feedWindow: nextFeedWindow }),
+    onShowCleared: () => clearedDialog.current?.showModal(),
+    onEdit,
+    onSortChange: (nextSort) => updateUrlState({ sort: nextSort }),
+    onProfileChange: (profile) => updateUrlState({ profile, sourceId: null, sourceName: null }),
+    profiles,
+    savedCount: shelfChanges.length,
+    selectedProfile,
+    sourceFilter,
+    sort,
+    sourceCount,
+  };
+
   return (
     <main className="overflow-x-hidden text-ink [overflow-anchor:none]">
 
-      <section className="relative mx-auto grid max-w-7xl gap-3 sm:gap-5 lg:grid-cols-[330px_minmax(0,1fr)]">
-        <ControlPanel
-          queueCount={deskChanges.length}
-          dismissedCount={dismissedCount}
-          feedWindow={feedWindow}
-          onClearSourceFilter={() => updateUrlState({ sourceId: null, sourceName: null })}
-          onFeedWindowChange={(nextFeedWindow) => updateUrlState({ feedWindow: nextFeedWindow })}
-          onShowCleared={() => clearedDialog.current?.showModal()}
-          onEdit={onEdit}
-          onSortChange={(nextSort) => updateUrlState({ sort: nextSort })}
-          onProfileChange={(profile) => {
-            updateUrlState({ profile, sourceId: null, sourceName: null });
-          }}
-          profiles={profiles}
-          savedCount={shelfChanges.length}
-          selectedProfile={selectedProfile}
-          sourceFilter={sourceFilter}
-          sort={sort}
-          sourceCount={sourceCount}
-        />
+      <section className={`relative mx-auto grid max-w-7xl gap-3 sm:gap-5 ${wide ? "grid-cols-[330px_minmax(0,1fr)]" : ""}`}>
+        {wide ? <ControlPanel {...controlProps} /> : headerSlot ? createPortal(<CompactControls {...controlProps} />, headerSlot) : null}
 
         <div className="flex min-w-0 flex-col gap-3 sm:gap-5">
           {error ? <div><ErrorNote message={error} /><button className="editor-button mt-2" disabled={pending} onClick={() => { clearReadCache(); setRetry((value) => value + 1); }}>Reload desk from server</button></div> : null}
           {pending ? <p role="status" className="sr-only">Save in progress...</p> : null}
+          {!wide && sourceFilter ? <SourceFilterNote filter={sourceFilter} onClear={controlProps.onClearSourceFilter} /> : null}
           {!isLoading && sourceCount === 0 ? <section className="rounded border-2 border-line bg-surface p-6 shadow-hard">
             <h2 className="text-3xl font-extrabold">Build your edition</h2>
             <p className="my-3 text-sm leading-6">{profiles.length === 0 ? "Paste a website or GitHub link to discover and preview a source. Create a profile when you want to save." : "This profile has no active sources. Add or enable a source, then fetch its latest changes."}</p>
             <button className="editor-button editor-primary" onClick={onEdit}>{profiles.length === 0 ? "Find your first source" : "Add or manage sources"}</button>
           </section> : null}
 
-          <section data-queue="shelf" className="rounded border-2 border-line bg-select px-2 py-3 text-select-fg sm:p-5">
-            <QueueHeader
-              count={shelfChanges.length}
-              icon={<BookmarkCheck className="h-4 w-4" />}
-              swipeHint="Swipe left to mark read, right to open the source."
-              title="The shelf"
-              tone="shelf"
-            >
-              {shelfChanges.length === 0
-                ? "Nothing shelved yet. Shelf a desk item and it waits here until you mark it read."
-                : `${shelfChanges.length} item${shelfChanges.length === 1 ? "" : "s"} shelved for later. Mark read when done, or put one back on the desk.`}
-            </QueueHeader>
+          {shelfChanges.length ? <section data-queue="shelf" className="rounded border-2 border-line bg-select px-1 py-3 text-select-fg sm:p-5">
+            <QueueHeader count={shelfChanges.length} icon={<BookmarkCheck className="h-4 w-4" />} title="The shelf" tone="shelf" />
+            <div className="mt-4 grid gap-4">
+              {shelfChanges.map((change) => (
+                <ChangeCard key={change.change_key} {...cardProps(change, "shelf")} />
+              ))}
+            </div>
+          </section> : null}
 
-            {shelfChanges.length === 0 ? null : (
-              <div className="mt-4 grid gap-4">
-                {shelfChanges.map((change) => (
-                  <ChangeCard key={change.change_key} {...cardProps(change, "shelf")} />
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section data-queue="desk" className="rounded border-2 border-line bg-raised px-2 py-3 sm:p-5">
-            <QueueHeader count={deskChanges.length} icon={<Newspaper className="h-4 w-4" />} swipeHint="Swipe left to clear, right to shelf." title="The desk" tone="desk">
+          <section data-queue="desk" className="rounded border-2 border-line bg-raised px-1 py-3 sm:p-5">
+            <QueueHeader count={deskChanges.length} icon={<Newspaper className="h-4 w-4" />} title="The desk" tone="desk">
               {isLoading ? "Load your feed..." : error ? "The feed could not load. Retry above." : sourceCount === 0 ? "Add or enable a source to fill your desk."
                 : deskChanges.length ? `${deskChanges.length} readable ${profileLabel(selectedProfile)} item${deskChanges.length === 1 ? "" : "s"} from the last ${windowLabel(feedWindow)}.`
                   : shelfChanges.length ? "Your current items are on the shelf."
@@ -824,7 +821,7 @@ function Feed({ owner, profiles, revision, onEdit }: { owner: string; profiles: 
   );
 }
 
-function QueueHeader({ children, count, icon, title, tone }: { children: ReactNode; count: number; icon: ReactNode; swipeHint: string; title: string; tone: "shelf" | "desk" }) {
+function QueueHeader({ children, count, icon, title, tone }: { children?: ReactNode; count: number; icon: ReactNode; title: string; tone: "shelf" | "desk" }) {
   const muted = tone === "shelf" ? "text-select-fg" : "text-muted";
   const body = tone === "shelf" ? "text-select-fg" : "text-muted";
   return (
@@ -841,23 +838,7 @@ function QueueHeader({ children, count, icon, title, tone }: { children: ReactNo
   );
 }
 
-function ControlPanel({
-  queueCount,
-  dismissedCount,
-  feedWindow,
-  onClearSourceFilter,
-  onFeedWindowChange,
-  onProfileChange,
-  onShowCleared,
-  onEdit,
-  onSortChange,
-  profiles,
-  savedCount,
-  selectedProfile,
-  sourceFilter,
-  sort,
-  sourceCount,
-}: {
+type ControlProps = {
   queueCount: number;
   dismissedCount: number;
   feedWindow: FeedWindow;
@@ -873,85 +854,115 @@ function ControlPanel({
   sourceFilter: SourceFilter;
   sort: SortKey;
   sourceCount: number;
-}) {
-  const selectClassName = "h-11 w-full min-w-0 rounded border-2 border-line bg-surface px-2 text-base font-semibold text-ink sm:px-3 sm:text-sm";
+};
+
+/** Wide screens: the counts and the feed selection in a side panel. */
+function ControlPanel(props: ControlProps) {
   return (
-    <aside className="lg:sticky lg:top-5 lg:self-start">
+    <aside className="sticky top-5 self-start">
       <div className="overflow-hidden rounded border-2 border-line bg-surface text-ink shadow-hard">
-
-        <div className="grid grid-cols-4 gap-[2px] border-b-2 border-line bg-line text-center lg:grid-cols-2">
-          <DeskStat label="desk" value={queueCount} />
-          <DeskStat label="shelf" value={savedCount} />
-          <DeskStat label="sources" value={sourceCount} onClick={onEdit} />
-          <DeskStat label="cleared" value={dismissedCount} onClick={onShowCleared} />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 p-4 lg:grid-cols-1 lg:gap-4 lg:p-6">
-          <label className="col-span-2 block min-w-0 lg:col-span-1">
-            <span className="mb-2 flex items-center gap-1 text-xs font-extrabold uppercase tracking-[0.06em] text-muted sm:gap-2">
-              <Inbox className="h-4 w-4" />
-              Profile
-            </span>
-            <select id="profile-select" className={selectClassName} value={selectedProfile} disabled={profiles.length === 0} onChange={(event) => onProfileChange(event.target.value)}>
-              {profiles.length === 0 ? <option value="">No profiles</option> : null}
-              {profiles.map((profile) => (
-                <option key={profile.name} value={profile.name}>
-                  {profileLabel(profile.name)}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="block min-w-0">
-            <span className="mb-2 flex items-center gap-1 text-xs font-extrabold uppercase tracking-[0.06em] text-muted sm:gap-2">
-              <CalendarDays className="h-4 w-4" />
-              Window
-            </span>
-            <select id="window-select" className={selectClassName} value={feedWindow} onChange={(event) => onFeedWindowChange(event.target.value as FeedWindow)}>
-              {feedWindows.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="block min-w-0">
-            <span className="mb-2 flex items-center gap-1 text-xs font-extrabold uppercase tracking-[0.06em] text-muted sm:gap-2">
-              <LibraryBig className="h-4 w-4" />
-              Order
-            </span>
-            <select id="sort-select" className={selectClassName} value={sort} onChange={(event) => onSortChange(event.target.value as SortKey)}>
-              {sortOptions.map((item) => (
-                <option key={item.value} value={item.value}>
-                  {item.value === "newest" ? "Newest" : item.value === "oldest" ? "Oldest" : "By source"}
-                </option>
-              ))}
-            </select>
-          </label>
-
-
-          {sourceFilter ? (
-            <div className="col-span-2 rounded border-2 border-shadow bg-select p-3 text-select-fg lg:col-span-1">
-              <div className="text-xs font-extrabold uppercase tracking-[0.06em]">Source filter</div>
-              <div className="mt-1 text-sm font-extrabold [overflow-wrap:anywhere]">{sourceFilter.name}</div>
-              <button className="mt-1 inline-flex min-h-11 items-center text-sm font-extrabold underline decoration-2 underline-offset-4" onClick={onClearSourceFilter} type="button">
-                Show all sources
-              </button>
-            </div>
-          ) : null}
+        <div className="border-b-2 border-line"><DeskStats {...props} /></div>
+        <div className="grid gap-4 p-6">
+          <FeedControls {...props} />
+          {props.sourceFilter ? <SourceFilterNote filter={props.sourceFilter} onClear={props.onClearSourceFilter} /> : null}
         </div>
       </div>
     </aside>
   );
 }
 
+/** Small screens: the counts and the feed selection as two buttons in the top bar, left of the GitHub menu. */
+function CompactControls(props: ControlProps) {
+  return <>
+    <HeaderMenu label={`Counts: ${props.queueCount} on the desk`} summary={<span className="text-lg font-extrabold leading-none">{props.queueCount}</span>}>
+      {(close) => <div className="-m-4 overflow-hidden rounded-sm"><DeskStats {...props} onEdit={() => { close(); props.onEdit(); }} onShowCleared={() => { close(); props.onShowCleared(); }} /></div>}
+    </HeaderMenu>
+    <HeaderMenu label="Profile, window and order" summary={<>
+      <SlidersHorizontal className="h-5 w-5" />
+      <span className="hidden max-w-[6rem] truncate text-sm font-extrabold min-[400px]:inline">{profileLabel(props.selectedProfile)}</span>
+    </>}>
+      {() => <FeedControls {...props} />}
+    </HeaderMenu>
+  </>;
+}
+
+function DeskStats({ queueCount, savedCount, sourceCount, dismissedCount, onEdit, onShowCleared }: ControlProps) {
+  return (
+    <div className="grid grid-cols-2 gap-[2px] bg-line text-center">
+      <DeskStat label="desk" value={queueCount} />
+      <DeskStat label="shelf" value={savedCount} />
+      <DeskStat label="sources" value={sourceCount} onClick={onEdit} />
+      <DeskStat label="cleared" value={dismissedCount} onClick={onShowCleared} />
+    </div>
+  );
+}
+
+function FeedControls({ feedWindow, onFeedWindowChange, onProfileChange, onSortChange, profiles, selectedProfile, sort }: ControlProps) {
+  const selectClassName = "h-11 w-full min-w-0 rounded border-2 border-line bg-surface px-3 text-base font-semibold text-ink lg:text-sm";
+  return <>
+    <label className="block min-w-0">
+      <span className="mb-2 flex items-center gap-2 text-xs font-extrabold uppercase tracking-[0.06em] text-muted">
+        <Inbox className="h-4 w-4" />
+        Profile
+      </span>
+      <select id="profile-select" className={selectClassName} value={selectedProfile} disabled={profiles.length === 0} onChange={(event) => onProfileChange(event.target.value)}>
+        {profiles.length === 0 ? <option value="">No profiles</option> : null}
+        {profiles.map((profile) => (
+          <option key={profile.name} value={profile.name}>
+            {profileLabel(profile.name)}
+          </option>
+        ))}
+      </select>
+    </label>
+
+    <label className="block min-w-0">
+      <span className="mb-2 flex items-center gap-2 text-xs font-extrabold uppercase tracking-[0.06em] text-muted">
+        <CalendarDays className="h-4 w-4" />
+        Window
+      </span>
+      <select id="window-select" className={selectClassName} value={feedWindow} onChange={(event) => onFeedWindowChange(event.target.value as FeedWindow)}>
+        {feedWindows.map((item) => (
+          <option key={item.value} value={item.value}>
+            {item.label}
+          </option>
+        ))}
+      </select>
+    </label>
+
+    <label className="block min-w-0">
+      <span className="mb-2 flex items-center gap-2 text-xs font-extrabold uppercase tracking-[0.06em] text-muted">
+        <LibraryBig className="h-4 w-4" />
+        Order
+      </span>
+      <select id="sort-select" className={selectClassName} value={sort} onChange={(event) => onSortChange(event.target.value as SortKey)}>
+        {sortOptions.map((item) => (
+          <option key={item.value} value={item.value}>
+            {item.value === "newest" ? "Newest" : item.value === "oldest" ? "Oldest" : "By source"}
+          </option>
+        ))}
+      </select>
+    </label>
+  </>;
+}
+
+function SourceFilterNote({ filter, onClear }: { filter: NonNullable<SourceFilter>; onClear: () => void }) {
+  return (
+    <div className="rounded border-2 border-shadow bg-select p-3 text-select-fg">
+      <div className="text-xs font-extrabold uppercase tracking-[0.06em]">Source filter</div>
+      <div className="mt-1 text-sm font-extrabold [overflow-wrap:anywhere]">{filter.name}</div>
+      <button className="mt-1 inline-flex min-h-11 items-center text-sm font-extrabold underline decoration-2 underline-offset-4" onClick={onClear} type="button">
+        Show all sources
+      </button>
+    </div>
+  );
+}
+
 function DeskStat({ label, value, onClick }: { label: string; value: number; onClick?: () => void }) {
   const content = <>
       <div className="text-2xl font-extrabold leading-none text-ink lg:text-3xl">{value}</div>
-      <div className={`mt-1 text-xs font-extrabold capitalize text-muted lg:uppercase lg:tracking-[0.06em] ${onClick ? "underline decoration-accent decoration-2 underline-offset-4" : ""}`}>{label}</div>
+      <div className={`mt-1 text-xs font-extrabold uppercase tracking-[0.06em] text-muted ${onClick ? "underline decoration-accent decoration-2 underline-offset-4" : ""}`}>{label}</div>
     </>;
-  const classes = "min-w-0 bg-surface px-1 py-3 lg:px-3 lg:py-4";
+  const classes = "min-w-0 bg-surface px-3 py-4";
   return onClick ? <button type="button" className={`${classes} hover:bg-raised`} onClick={onClick} aria-label={label === "sources" ? "Manage sources and profiles" : "View cleared items"}>{content}</button> : <div className={classes}>{content}</div>;
 }
 
