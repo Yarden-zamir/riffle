@@ -4,7 +4,7 @@ import calendar
 from datetime import datetime, timezone
 from typing import Any
 
-from riffle.enrichment import PROFILES, enrich_change, plain_text, profile_for
+from riffle.enrichment import PROFILES, CardMedia, enrich_change, media_from_url, media_metadata, plain_text, profile_for
 from riffle.feeds import fetch_feed
 from riffle.models import ChangeInput, Source, TimeWindow
 from riffle.network import (
@@ -35,6 +35,21 @@ def _entry_link(entry: Any) -> str | None:
             if isinstance(href, str) and href:
                 return href
     return None
+
+
+def _entry_media(entry: Any, key: str, url_key: str, base_url: str | None) -> list[CardMedia | None]:
+    """The media that feedparser reads into `key`: `media_content`, `media_thumbnail` or `enclosures`."""
+    items = _entry_value(entry, key)
+    if not isinstance(items, list):
+        return []
+    found: list[CardMedia | None] = []
+    for item in items:
+        if not hasattr(item, "get") or not isinstance(item.get(url_key), str):
+            continue
+        # Media RSS names the kind in `medium`. Enclosures and Media RSS both can carry a MIME `type`.
+        hint = str(item.get("medium") or item.get("type") or "")
+        found.append(media_from_url(item[url_key], base_url=base_url, hint=hint))
+    return found
 
 
 def _entry_datetime(entry: Any) -> datetime | None:
@@ -156,6 +171,11 @@ class RssAtomPlugin:
                 feed_title=feed_title,
                 profile=enrichment_profile,
                 fetch_link=fetch_link,
+                feed_media=[
+                    *_entry_media(entry, "media_content", "url", link),
+                    *_entry_media(entry, "enclosures", "href", link),
+                ],
+                thumbnails=_entry_media(entry, "media_thumbnail", "url", link),
             )
             if enrichment_budget_exhausted:
                 enriched.quality_flags.append("enrichment_budget_exhausted")
@@ -184,7 +204,7 @@ class RssAtomPlugin:
                         "raw_title": _metadata_text(str(title)),
                         "raw_summary": _metadata_text(str(summary)),
                         "raw_content": _metadata_text(content),
-                        **({"media": [{"url": item.url, "kind": item.kind} for item in enriched.media]} if enriched.media else {}),
+                        **media_metadata(enriched.media),
                         **({} if dated else {"undated": True}),
                     },
                 )

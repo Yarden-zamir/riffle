@@ -5,7 +5,7 @@ from html.parser import HTMLParser
 from typing import Any
 from urllib.parse import urljoin, urlparse
 
-from riffle.enrichment import PROFILES, compact_blocks, plain_text, profile_for
+from riffle.enrichment import PROFILES, compact_blocks, media_metadata, page_media, plain_text, profile_for
 from riffle.models import ChangeInput, Source, TimeWindow
 from riffle.network import (
     MAX_ENTRIES,
@@ -244,6 +244,7 @@ class HtmlNewsPlugin:
                         "enrichment_profile": enrichment_profile.name,
                         "quality_flags": ["official_html_news"],
                         "raw_title": title,
+                        **media_metadata(page_media(html, str(article_response.url))),
                         **({} if dated else {"undated": True}),
                     },
                 )

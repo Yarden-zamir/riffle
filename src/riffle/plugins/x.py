@@ -8,6 +8,7 @@ from html.parser import HTMLParser
 
 import httpx
 
+from riffle.enrichment import CardMedia, media_from_url, media_metadata, merge_media
 from riffle.models import ChangeInput, Source, TimeWindow
 from riffle.network import (
     MAX_ENTRIES,
@@ -39,6 +40,28 @@ class _TimelineData(HTMLParser):
     def handle_data(self, data):
         if self.active:
             self.parts.append(data)
+
+
+def _post_media(post: dict) -> tuple[CardMedia, ...]:
+    """The photos and videos of a post. A video or GIF plays its best MP4 variant.
+
+    Media are decoration, so a media entry in an unknown shape is skipped and the post still shows.
+    """
+    found: list[CardMedia | None] = []
+    for container in (post.get("extended_entities"), post.get("entities")):
+        items = container.get("media") if isinstance(container, dict) else None
+        for item in items if isinstance(items, list) else []:
+            if not isinstance(item, dict) or not isinstance(item.get("media_url_https"), str):
+                continue
+            video_info = item.get("video_info")
+            variants = video_info.get("variants") if isinstance(video_info, dict) else None
+            mp4s = [v for v in (variants if isinstance(variants, list) else []) if isinstance(v, dict) and v.get("content_type") == "video/mp4" and isinstance(v.get("url"), str)]
+            if item.get("type") in {"video", "animated_gif"} and mp4s:
+                best = max(mp4s, key=lambda v: v.get("bitrate") if isinstance(v.get("bitrate"), int) else 0)
+                found.append(media_from_url(best["url"], hint="video"))
+            else:
+                found.append(media_from_url(item["media_url_https"], hint="image"))
+    return merge_media(found)
 
 
 class XPlugin:
@@ -133,6 +156,7 @@ class XPlugin:
                         "platform": "x",
                         "username": username,
                         "provider": "public-embed",
+                        **media_metadata(_post_media(post)),
                     },
                 )
             )

@@ -9,6 +9,7 @@ from typing import Any
 from xml.etree import ElementTree
 from xml.parsers import expat
 
+from riffle.enrichment import CardMedia, media_from_url, media_metadata, merge_media
 from riffle.models import ChangeInput, Source, TimeWindow
 from riffle.network import MAX_ENTRIES, PublicFetcher, PublicFetchError, validate_public_url, validate_source_config
 from riffle.plugin import PluginConfigError
@@ -16,6 +17,7 @@ from riffle.plugins.rss_atom import _matches_filters
 
 SITEMAP = "{http://www.sitemaps.org/schemas/sitemap/0.9}"
 NEWS = "{http://www.google.com/schemas/sitemap-news/0.9}"
+IMAGE = "{http://www.google.com/schemas/sitemap-image/1.1}"
 # An index lists its newest sitemap first. Reading 8 children leaves room in the 12-request budget for redirects.
 # Revisit when a source publishes more than 8 sitemap pages of news inside one refresh window.
 MAX_CHILD_SITEMAPS = 8
@@ -28,6 +30,7 @@ class NewsEntry:
     published_at: datetime
     publication: str
     keywords: str
+    media: tuple[CardMedia, ...]
 
 
 def _string_list_config(config: dict[str, Any], key: str) -> list[str]:
@@ -102,6 +105,8 @@ def news_entries(root: ElementTree.Element) -> list[NewsEntry]:
             published_at=published_at,
             publication=_text(news, f"{NEWS}publication/{NEWS}name"),
             keywords=_text(news, f"{NEWS}keywords"),
+            # The image sitemap extension lists the pictures of the article.
+            media=merge_media(media_from_url(src, hint="image") for image in item.iter(f"{IMAGE}image") if (src := _text(image, f"{IMAGE}loc"))),
         ))
     return entries
 
@@ -179,7 +184,7 @@ class NewsSitemapPlugin:
                 title=entry.title[:500],
                 url=entry.url,
                 published_at=entry.published_at,
-                metadata={"feed_url": url, "publication": entry.publication, "keywords": entry.keywords},
+                metadata={"feed_url": url, "publication": entry.publication, "keywords": entry.keywords, **media_metadata(entry.media)},
             ))
             if len(changes) == MAX_ENTRIES:
                 break
