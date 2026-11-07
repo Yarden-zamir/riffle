@@ -174,6 +174,10 @@ An owner shares the sources of a profile through a link. Another person imports 
 13. Source and profile limits apply. An import that passes a limit fails as a whole with `409` and writes nothing.
 14. An unknown or ended token returns `404` for read and for import.
 
+The HTML of `/share/{token}` includes a title, description, Open Graph tags, and Twitter summary-card tags before JavaScript runs. It uses only the public projection from item 5: profile name, optional GitHub login, and the count of shared sources after the plugin filter. Every dynamic value is HTML-escaped. No source settings or private feed items are embedded in the head. HTML stays uncached, so an ended link returns generic Riffle metadata on subsequent requests. The page shell still loads and its API read returns `404`, showing the normal unknown-or-ended-link message.
+
+Shares contain no recent headlines. Showing sample headlines would require a separately approved change to item 7 and to the public API contract; importing recent items does not make those items public.
+
 ## Request Safety
 
 - `GET /me` resolves identity before account access and needs no owner header.

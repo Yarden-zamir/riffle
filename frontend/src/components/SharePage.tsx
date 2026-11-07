@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { ErrorNote } from "./ErrorNote";
 import { api, ApiError, apiUrl, errorMessage, getIdentity, type Identity, type Profile, type SharedProfile, type ShareImportResult } from "../lib/api";
 
-// Shared profile page: frontend/API.md "Shared Profile Page".
+// Shared profile page: frontend/API.md "Shared Profiles".
 function shareError(cause: unknown) {
   if (cause instanceof ApiError && cause.status === 404) return "This share link is unknown, or its owner stopped sharing the profile.";
   if (cause instanceof ApiError && cause.status === 409) return "The import would pass the limit of 100 sources or 30 profiles. Remove sources or profiles first.";
@@ -69,11 +69,6 @@ export function SharePage({ token }: { token: string }) {
       {!shared ? (error ? <ErrorNote message={error} /> : <p role="status">Load the shared profile...</p>) : <>
         <div className="grid gap-3 rounded border-2 border-line bg-surface p-5 shadow-hard">
           <p className="text-lg leading-7">{owner} <strong>{shared.name}</strong> profile follows {shared.sources.length} {shared.sources.length === 1 ? "source" : "sources"}. Import them to start your own feed with the same news.</p>
-          <ul className="grid max-h-80 gap-1 overflow-y-auto border-y-2 border-raised py-2 text-sm">
-            {shared.sources.map((source) => <li key={`${source.name}:${host(source.config)}`} className="flex flex-wrap justify-between gap-x-3">
-              <span className="font-semibold">{source.name}</span><span className="font-mono text-xs text-muted">{host(source.config)}</span>
-            </li>)}
-          </ul>
           <p className="text-sm leading-6">The import copies these sources and their items from the last 30 days. It never copies the read marks, shelf, or notes of the person who shared.</p>
           {result ? <div role="status" className="grid gap-2">
             <p className="font-semibold">Imported into "{result.profile}": {result.sources} new {result.sources === 1 ? "source" : "sources"} and {result.changes} recent items.{result.skipped ? ` ${result.skipped} that you already follow there stayed as they were.` : ""}</p>
@@ -89,6 +84,14 @@ export function SharePage({ token }: { token: string }) {
             You are not signed in, so the import goes into this browser only.{" "}
             {identity.auth_enabled ? <>To keep the sources in an account, <a className="underline underline-offset-4" href={signIn}>sign in with GitHub</a> first.</> : null}
           </p> : null}
+          <details className="min-w-0 border-t-2 border-raised pt-2">
+            <summary className="cursor-pointer py-2 font-semibold">Show {shared.sources.length} {shared.sources.length === 1 ? "source" : "sources"}</summary>
+            <ul className="grid max-h-80 gap-1 overflow-y-auto py-2 text-sm">
+              {shared.sources.map((source) => <li key={`${source.name}:${host(source.config)}`} className="flex flex-wrap justify-between gap-x-3 break-words [overflow-wrap:anywhere]">
+                <span className="font-semibold">{source.name}</span><span className="font-mono text-xs text-muted">{host(source.config)}</span>
+              </li>)}
+            </ul>
+          </details>
         </div>
         {error ? <ErrorNote message={error} /> : null}
       </>}
