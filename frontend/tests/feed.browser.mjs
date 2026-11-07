@@ -65,7 +65,7 @@ test("feed browser contracts", { skip: !process.env.PLAYWRIGHT_MODULE, timeout: 
       if (url.pathname === "/me") return send({ id: state.owner, authenticated: true, login: "tester", auth_enabled: true, anonymous_has_data: false });
       assert.equal(request.headers()["x-riffle-owner"], state.owner);
       if (url.pathname === "/profiles") return send([{ name: "Work", source_count: 2 }, { name: "Other", source_count: 1 }]);
-      if (["/sources", "/plugins", "/catalog"].includes(url.pathname) && method === "GET") return send([]);
+      if (["/sources", "/plugins", "/catalog", "/agent/tokens"].includes(url.pathname) && method === "GET") return send([]);
       if (url.pathname === "/changes" && method === "GET") {
         state.reads++;
         return send(state.changes.filter((item) => item.source_profile === url.searchParams.get("profile") &&
@@ -98,20 +98,25 @@ test("feed browser contracts", { skip: !process.env.PLAYWRIGHT_MODULE, timeout: 
     return card(page, id).boundingBox();
   }
 
-  await t.test("mobile controls use a full-width profile and readable window/order row", async () => {
+  await t.test("small screens keep counts and feed selection in header buttons and hide an empty shelf", async () => {
     const { page } = await setup(true);
     for (const width of [320, 390]) {
       await page.setViewportSize({ width, height: 844 });
-      const profile = await page.locator('#profile-select').boundingBox();
-      const window = await page.locator('#window-select').boundingBox();
-      const sort = await page.locator('#sort-select').boundingBox();
-      assert.ok(profile.width > window.width * 1.8);
-      assert.equal(window.y, sort.y);
-      assert.ok(window.y > profile.y);
-      assert.equal(await page.getByLabel('Current feed selection').count(), 0);
+      const buttons = await Promise.all([page.getByLabel(/^Counts:/), page.getByLabel("Profile, window and order"), page.getByLabel("GitHub account menu")]
+        .map((locator) => locator.boundingBox()));
+      assert.ok(buttons.every((box) => box.y === buttons[0].y), "The three buttons share the top bar row");
+      assert.equal(await page.getByLabel(/^Counts:/).textContent(), "9");
+      assert.equal(await page.locator("#profile-select").isVisible(), false);
+      await page.getByLabel("Profile, window and order").click();
+      assert.equal(await page.locator("#profile-select").isVisible(), true);
+      assert.equal(await page.locator("#sort-select").isVisible(), true);
+      await page.keyboard.press("Escape");
+      assert.equal(await page.locator("#profile-select").isVisible(), false);
+      assert.equal(await page.locator('[data-queue="shelf"]').count(), 0);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
       const readingWidth = await card(page, 1).locator('.riffle-rendered').evaluate((element) => element.getBoundingClientRect().width);
-      assert.ok(readingWidth > width * 0.78, "Article text uses most of the mobile screen width");
+      assert.ok(readingWidth > width * 0.78, `Article text uses most of the mobile screen width: ${readingWidth}`);
+      assert.equal(await clear(card(page, 1)).count(), 0, "Swipes replace the clear button");
       if (process.env.SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.SCREENSHOT_DIR}/compact-panel-${width}.png` });
     }
   });
@@ -126,9 +131,11 @@ test("feed browser contracts", { skip: !process.env.PLAYWRIGHT_MODULE, timeout: 
     assert.equal(await page.getByRole("link", { name: "Sign out" }).isVisible(), true);
     await page.keyboard.press("Escape");
     assert.equal(await page.getByRole("link", { name: "Sign out" }).isVisible(), false);
+    await page.getByLabel(/^Counts:/).click();
     await page.getByRole("button", { name: "Manage sources and profiles" }).click();
     await page.getByRole("dialog", { name: "Sources & profiles" }).waitFor();
     await page.getByRole("dialog", { name: "Sources & profiles" }).getByRole("button", { name: "Close", exact: true }).click();
+    await page.getByLabel(/^Counts:/).click();
     await page.getByRole("button", { name: "View cleared items" }).click();
     await page.getByText("No cleared items in this view.", { exact: true }).waitFor();
     await page.getByRole("dialog", { name: "Cleared items" }).getByRole("button", { name: "Close", exact: true }).click();
@@ -187,6 +194,7 @@ test("feed browser contracts", { skip: !process.env.PLAYWRIGHT_MODULE, timeout: 
     await page.getByLabel("GitHub account menu").click();
     assert.equal(await page.locator('input[switch]').isChecked(), false);
     assert.equal(await page.locator('input[switch]').isVisible(), false);
+    await page.getByLabel(/^Counts:/).click();
     await page.getByRole("button", { name: "View cleared items" }).click();
     await delay(100);
     await page.getByRole("dialog", { name: "Cleared items" }).getByRole("button", { name: "Close" }).focus();

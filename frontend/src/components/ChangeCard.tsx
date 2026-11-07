@@ -183,7 +183,8 @@ export function ChangeCard({ change, owner, location, focused, pending, noteDraf
           <MediaViewer index={viewerIndex} loadGif={loadGif} media={shownMedia} onIndexChange={setViewerIndex} />
         </div>
 
-        <div className={`flex flex-col justify-end border-t-2 border-line p-3 sm:p-4 md:justify-start md:gap-4 md:border-l-2 md:border-t-0 ${onShelf ? "bg-warning-surface" : "bg-raised"}`}>
+        {/* Below md, swipes clear and shelf the card, so the bar keeps only the actions without a gesture. */}
+        <div className={`flex items-center justify-end gap-2 border-t-2 border-line p-2 sm:p-3 md:flex-col md:items-stretch md:justify-start md:gap-4 md:border-l-2 md:border-t-0 md:p-4 ${onShelf ? "bg-warning-surface" : "bg-raised"}`}>
           <Button
             className="hidden whitespace-nowrap px-3 md:inline-flex"
             disabled={pending || swipe.leaving !== null}
@@ -194,46 +195,41 @@ export function ChangeCard({ change, owner, location, focused, pending, noteDraf
             {onShelf ? <Check className="mr-2 h-4 w-4" /> : <X className="mr-2 h-4 w-4" />}
             {onShelf ? "Mark read" : "Clear from desk"}
           </Button>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:mt-auto md:grid-cols-1">
-            {url ? (
-              <a
-                className="editor-button inline-flex h-10 items-center justify-center px-3 py-0 text-sm no-underline"
-                href={url}
-                rel="noreferrer"
-                target="_blank"
-              >
-                Open source
-                <ExternalLink className="ml-2 h-3.5 w-3.5" />
-              </a>
-            ) : null}
-            <div className={`grid grid-cols-[1fr_auto] gap-2 ${onShelf ? "md:grid-cols-1" : ""}`}>
-              <Button className={`whitespace-nowrap px-3 ${onShelf ? "md:hidden" : ""}`} disabled={pending || swipe.leaving !== null} onClick={onShelf ? () => swipe.trigger("left") : () => swipe.trigger("right")} variant="secondary">
-                {onShelf ? <Check className="mr-2 h-4 w-4" /> : <BookmarkPlus className="mr-2 h-4 w-4" />}
-                {onShelf ? "Mark read" : "Shelf"}
-              </Button>
-              <Button
-                aria-controls={noteId}
-                aria-expanded={noteOpen}
-                aria-label={noteOpen ? "Collapse note editor" : "Expand note editor"}
-                className="px-3"
-                onClick={onToggleNote}
-                title={noteOpen ? "Close note" : change.note.trim() ? "Edit note" : "Add note"}
-                variant="secondary"
-              >
-                <ChevronDown className={`h-4 w-4 transition-transform ${noteOpen ? "rotate-180" : ""}`} />
-              </Button>
-            </div>
+          <div className="flex min-w-0 flex-1 justify-end gap-2 md:mt-auto md:flex-none md:flex-wrap">
             {onShelf ? (
-              <Button className="whitespace-nowrap px-3" disabled={pending || swipe.leaving !== null} onClick={onToggleShelf} variant="secondary">
+              <Button className="min-w-0 flex-1 whitespace-nowrap px-3 md:basis-full" disabled={pending || swipe.leaving !== null} onClick={onToggleShelf} title="Back to desk (s)" variant="secondary">
                 <Undo2 className="mr-2 h-4 w-4" />
                 Back to desk
               </Button>
             ) : (
-              <Button className="whitespace-nowrap px-3 md:hidden" disabled={pending || swipe.leaving !== null} onClick={() => swipe.trigger("left")} variant="secondary">
-                <X className="mr-2 h-4 w-4" />
-                Clear from desk
+              <Button className="hidden min-w-0 flex-1 whitespace-nowrap px-3 md:inline-flex md:basis-full" disabled={pending || swipe.leaving !== null} onClick={() => swipe.trigger("right")} title="Shelf (s)" variant="secondary">
+                <BookmarkPlus className="mr-2 h-4 w-4" />
+                Shelf
               </Button>
             )}
+            <Button
+              aria-controls={noteId}
+              aria-expanded={noteOpen}
+              aria-label={noteOpen ? "Collapse note editor" : "Expand note editor"}
+              className="min-w-11 px-0"
+              onClick={onToggleNote}
+              title={noteOpen ? "Close note (n)" : change.note.trim() ? "Edit note (n)" : "Add note (n)"}
+              variant="secondary"
+            >
+              <ChevronDown className={`h-4 w-4 transition-transform ${noteOpen ? "rotate-180" : ""}`} />
+            </Button>
+            {url ? (
+              <a
+                aria-label="Open source"
+                className="editor-button inline-flex h-10 min-w-11 items-center justify-center p-0 no-underline"
+                href={url}
+                rel="noreferrer"
+                target="_blank"
+                title="Open source (o)"
+              >
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            ) : null}
           </div>
         </div>
       </div>
