@@ -306,6 +306,13 @@ def test_exact_byte_limit_is_allowed(wire: Wire) -> None:
     )
 
 
+def test_full_content_feed_over_two_mib_is_allowed(wire: Wire) -> None:
+    # Substack full-content feeds, such as thezvi.substack.com/feed, exceed 2 MiB.
+    body = b"a" * (3 * 1024 * 1024)
+    wire.responses.append(response(body))
+    assert PublicFetcher().get("http://example.com").content == body
+
+
 def test_compression_is_rejected_before_decompression(wire: Wire) -> None:
     wire.responses.append(
         response(b"compressed bomb", headers=b"Content-Encoding: gzip\r\n")
