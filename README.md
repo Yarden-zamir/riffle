@@ -48,7 +48,7 @@ The approved editor contract covers these actions. This summary does not certify
 - Discovery retains the release URL and names the candidate `{owner}/{repo} updates`. Every fetch rechecks releases; the first release switches future fetches back.
 - Cached commit cards and their shelf state, dismissed state, and notes remain intact. Fallback cards show a Commit badge; nonempty fallback previews explain it.
 - Direct `/commits.atom`, `/commits`, and `/commits/{branch}.atom` inputs work, including valid encoded branches. Branch HTML paths such as `/commits/main` remain unsupported.
-- Release checks and fallback share public fetch limits: 12 requests, 60 seconds, 2 MiB per response, and three redirects per request.
+- Release checks and fallback share public fetch limits: 12 requests, 60 seconds, 8 MiB per response, and three redirects per request.
 - Discovery shares four concurrent source operations with previews and refreshes. HTTP failures remain visible, never successful empty results.
 - Select a profile or use inline `Create and select`. The independent profile manager retains create, rename, and confirmed delete.
 - Name, profile, and enabled-state edits retain preview, including inline profile creation and profile rename. Profile rename leaves a clean source draft clean.

@@ -18,7 +18,8 @@ import httpx
 from riffle.enrichment import PROFILES
 from riffle.models import SourceCreate
 
-MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+# Full-content feeds run to megabytes: a Substack feed with 20 posts is over 2 MiB.
+MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 MAX_REDIRECTS = 3
 MAX_REQUESTS = 12
 MAX_ENTRIES = 200

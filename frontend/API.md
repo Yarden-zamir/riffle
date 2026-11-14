@@ -209,7 +209,7 @@ An active URL `source` filter adds `source_id={id}` to `GET /changes`. The serve
 16. Preview requires no profile. Save requires explicit profile selection or creation and an explicit save action.
 17. Only a normalized fetch-signature change invalidates preview, as defined in Preview Validity. Name, profile, and enabled-state edits retain preview.
 18. All remaining manual controls stay under Advanced, collapsed for RSS/Atom drafts: handler, URL, enrichment, and HTML options. HTML requires an explicit `article_path_prefix`.
-19. Discovery uses one `PublicFetcher` for the release check and fallback, with 12 requests and a 60-second total deadline. Each response permits 2 MiB; each request permits three redirects. Redirects share the request budget; preview has its own invocation.
+19. Discovery uses one `PublicFetcher` for the release check and fallback, with 12 requests and a 60-second total deadline. Each response permits 8 MiB; each request permits three redirects. Redirects share the request budget; preview has its own invocation.
 20. The shared semaphore permits four concurrent operations across discovery, previews, manual refreshes, and scheduled refreshes. Discovery has no separate capacity pool.
 21. Branch validation uses the normalized, decoded branch name and preserves valid URL encoding, including `%2F`. Branch HTML paths remain unsupported.
 
