@@ -240,7 +240,7 @@ Behavior:
 - Every source request validates all DNS answers and rejects private, loopback, link-local, reserved, and other non-public addresses.
 - Connections pin validated numeric addresses. They do not repeat DNS resolution before connection.
 - Redirects and article or enrichment links receive the same validation to prevent server-side request forgery.
-- Each request follows at most 3 redirects. Each response body has a 2 MiB limit.
+- Each request follows at most 3 redirects. Each response body has an 8 MiB limit, so full-content feeds such as Substack feeds fit.
 - Each source invocation allows at most 12 requests, a 60-second total deadline, and at most 200 candidate entries.
 - Redirects, release checks, commit fallback requests, article requests, and enrichment requests share the invocation budget.
 - Compressed responses are rejected. Revisit bounded decompression if a required source needs compression.
