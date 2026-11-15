@@ -187,7 +187,7 @@ export function ChangeCard({ change, owner, location, focused, pending, noteDraf
           <MediaViewer index={viewerIndex} loadGif={loadGif} media={shownMedia} onIndexChange={setViewerIndex} />
         </div>
 
-        {/* Below md, swipes clear and shelf the card, so the bar keeps only the actions without a gesture. */}
+        {/* Below md, swipes shelve the card, so the bar has no Shelf button. A small button next to the note also clears it. */}
         <div className={`flex items-center justify-end gap-2 border-t-2 border-line p-2 sm:p-3 md:flex-col md:items-stretch md:justify-start md:gap-4 md:border-l-2 md:border-t-0 md:p-4 ${onShelf ? "bg-warning-surface" : "bg-raised"}`}>
           <Button
             className="hidden whitespace-nowrap px-3 md:inline-flex"
@@ -211,6 +211,16 @@ export function ChangeCard({ change, owner, location, focused, pending, noteDraf
                 Shelf
               </Button>
             )}
+            <Button
+              aria-label={onShelf ? "Mark read" : "Clear from desk"}
+              className="min-w-11 px-0 md:hidden"
+              disabled={pending || swipe.leaving !== null}
+              onClick={() => swipe.trigger("left")}
+              title={`${onShelf ? "Mark read" : "Clear from desk"} (x)`}
+              variant="secondary"
+            >
+              {onShelf ? <Check className="h-4 w-4" /> : <X className="h-4 w-4" />}
+            </Button>
             <Button
               aria-controls={noteId}
               aria-expanded={noteOpen}

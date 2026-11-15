@@ -452,7 +452,7 @@ Behavior:
 - At animation completion the queue updates optimistically, without waiting for the server. Other cards remain usable while writes finish serially in the background.
 - Failed writes restore the failed and unsent optimistic changes, cancel unsent jobs, and require an explicit reload. Acknowledged changes remain saved. Undo waits until queued writes finish.
 - Desktop cards place Clear or Mark read at the top right, independent of content height. Mobile cards keep a bottom action bar.
-- Below the medium breakpoint, cards show no Clear, Mark read, or Shelf button, because swipes do those actions.
+- Below the medium breakpoint, cards show no Shelf button, because a swipe shelves. A small icon button next to the note button clears the card, or marks it read on the shelf.
 - Open source is an icon button at all sizes.
 - When a card leaves a queue, the card after it takes its place in the viewport. Shelving does not move the viewport even though the shelf above grows.
 - Keyboard: `j`/`k` or arrow keys move the current card, `x` clears or marks read, `s` shelves or unshelves, `o` or Enter opens the source, `n` toggles the note, `z` undoes. Keys are ignored while typing.
