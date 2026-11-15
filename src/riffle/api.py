@@ -9,7 +9,7 @@ import httpx
 import uvicorn
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -50,6 +50,7 @@ from riffle.refresh import HourlyRefreshLoop
 from riffle.request_body import BodyLimitMiddleware
 from riffle.seed import DEFAULT_SOURCES, seed_default_sources
 from riffle.service import generate_changes
+from riffle.share_preview import share_page_html
 from riffle.timeutils import parse_window
 
 # A GIF of a release note can hold many frames. Larger GIFs show without the scrubber.
@@ -95,7 +96,7 @@ def _env_bool(name: str, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
-def create_app() -> FastAPI:
+def create_app(*, frontend_dist: Path | None = None) -> FastAPI:
     auth_enabled = _env_bool("RIFFLE_AUTH_ENABLED", False)
     proxy_url = os.environ.get(
         "RIFFLE_OAUTH2_PROXY_URL", "http://oauth2-proxy:4180"
@@ -524,9 +525,10 @@ def create_app() -> FastAPI:
 
     app.include_router(agent_router)
 
-    frontend_dist = Path(__file__).resolve().parents[2] / "frontend" / "dist"
-    if not frontend_dist.exists():
-        frontend_dist = Path.cwd() / "frontend" / "dist"
+    if frontend_dist is None:
+        frontend_dist = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+        if not frontend_dist.exists():
+            frontend_dist = Path.cwd() / "frontend" / "dist"
     if frontend_dist.exists():
         index = frontend_dist / "index.html"
 
@@ -535,10 +537,15 @@ def create_app() -> FastAPI:
         def connect_page() -> FileResponse:
             return FileResponse(index)
 
-        # The frontend renders the shared profile page for this path.
+        # Crawlers need metadata before JavaScript runs. Use the same public projection as /shares.
         @app.get("/share/{token}", include_in_schema=False)
-        def share_page(token: str) -> FileResponse:
-            return FileResponse(index)
+        def share_page(token: str) -> HTMLResponse:
+            try:
+                shared = store.get_shared_profile(token, share_keys)
+            except KeyError:
+                # Keep the SPA shell; its public API request renders the normal not-found message.
+                shared = None
+            return HTMLResponse(share_page_html(index.read_text(encoding="utf-8"), shared))
 
         app.mount("/", StaticFiles(directory=frontend_dist, html=True), name="frontend")
     return app
