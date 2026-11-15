@@ -2,7 +2,7 @@ import { BookmarkCheck, BookmarkPlus, CalendarDays, Check, ChevronDown, External
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { api } from "../lib/api";
-import { cardMedia, formatDate, openChange, renderedHtml, safeUrl, type CardLocation, type CardMedia, type ViewChange } from "../lib/changes";
+import { cardMedia, formatDate, isTooSmallForCard, openChange, renderedHtml, safeUrl, type CardLocation, type CardMedia, type ViewChange } from "../lib/changes";
 import { leaveDurationMs, useSwipe, type SwipeDirection } from "../lib/swipe";
 import { MediaViewer } from "./MediaViewer";
 import { Button } from "./ui/button";
@@ -48,8 +48,10 @@ export function ChangeCard({ change, owner, location, focused, pending, noteDraf
   const noteId = `note-${change.id}`;
   const onShelf = location === "shelf";
   const url = safeUrl(change.url);
-  const [failedMedia, setFailedMedia] = useState<ReadonlySet<string>>(new Set());
-  const shownMedia = cardMedia(change).filter((item) => !failedMedia.has(item.url));
+  // Media that failed to load, and images too small to show.
+  const [hiddenMedia, setHiddenMedia] = useState<ReadonlySet<string>>(new Set());
+  const hide = (item: CardMedia) => setHiddenMedia((hidden) => new Set(hidden).add(item.url));
+  const shownMedia = cardMedia(change).filter((item) => !hiddenMedia.has(item.url));
   const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const loadGif = useCallback(
     (item: CardMedia) => api<Blob>(`/changes/${change.id}/media/${item.index}`, { owner, as: "blob" }),
@@ -142,7 +144,7 @@ export function ChangeCard({ change, owner, location, focused, pending, noteDraf
           ) : null}
 
           {preview.trim() ? (
-            <div className="scrollbar-none mt-3 max-h-[30rem] touch-pan-y overflow-y-auto rounded border-2 border-line bg-raised px-2 py-2 sm:mt-4 sm:px-4 sm:py-3">
+            <div className="card-preview scrollbar-none mt-3 max-h-[30rem] touch-pan-y overflow-y-auto sm:mt-4 md:rounded md:border-2 md:border-line md:bg-raised md:px-4 md:py-3">
               <RenderedText value={preview} />
             </div>
           ) : (
@@ -150,18 +152,19 @@ export function ChangeCard({ change, owner, location, focused, pending, noteDraf
           )}
           {shownMedia.length ? (
             // The images, GIFs and videos of the post, in post order. They are decorative: the title names the post.
-            <div className="scrollbar-none mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain sm:mt-4" data-no-swipe={shownMedia.length > 1 ? "" : undefined}>
+            // Below md, the row runs to the card edges and the images have no frame, so text and pictures read as one flow.
+            <div className={`scrollbar-none -mx-3 mt-3 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain sm:-mx-5 sm:mt-4 md:mx-0 ${shownMedia.length > 1 ? "scroll-px-3 px-3 sm:scroll-px-5 sm:px-5 md:scroll-px-0 md:px-0" : ""}`} data-no-swipe={shownMedia.length > 1 ? "" : undefined}>
               {shownMedia.map((item, position) => (
                 <button
                   aria-label={`Enlarge ${item.kind === "video" ? "video" : "image"} ${position + 1} of ${shownMedia.length}`}
-                  className={`relative h-48 shrink-0 snap-start cursor-zoom-in overflow-hidden rounded border-2 border-line bg-raised sm:h-64 ${shownMedia.length === 1 ? "w-full" : "w-[85%] sm:w-[70%]"}`}
+                  className={`relative h-48 shrink-0 snap-start cursor-zoom-in overflow-hidden bg-raised sm:h-64 md:rounded md:border-2 md:border-line ${shownMedia.length === 1 ? "w-full" : "w-[85%] sm:w-[70%]"}`}
                   key={item.url}
                   onClick={() => setViewerIndex(position)}
                   type="button"
                 >
                   {item.kind === "video" ? (
                     <>
-                      <video className="h-full w-full object-cover object-top" muted onError={() => setFailedMedia((failed) => new Set(failed).add(item.url))} playsInline preload="metadata" src={item.url} />
+                      <video className="h-full w-full object-cover object-top" muted onError={() => hide(item)} playsInline preload="metadata" src={item.url} />
                       <span className="absolute inset-0 m-auto grid h-14 w-14 place-items-center rounded-full border-2 border-line bg-surface text-ink shadow-hard-sm"><Play className="h-6 w-6" /></span>
                     </>
                   ) : (
@@ -170,7 +173,8 @@ export function ChangeCard({ change, owner, location, focused, pending, noteDraf
                       className="h-full w-full object-cover object-top"
                       decoding="async"
                       loading="lazy"
-                      onError={() => setFailedMedia((failed) => new Set(failed).add(item.url))}
+                      onError={() => hide(item)}
+                      onLoad={(event) => { if (isTooSmallForCard(event.currentTarget)) hide(item); }}
                       referrerPolicy="no-referrer"
                       src={item.url}
                     />

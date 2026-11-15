@@ -120,6 +120,9 @@ class EnrichmentResult:
 MAX_CARD_MEDIA = 12
 VIDEO_SUFFIXES = (".mp4", ".webm", ".mov", ".m4v")
 MediaKind = Literal["image", "gif", "video"]
+# A declared width or height under this many pixels marks an icon, an avatar or a spacer.
+# GitHub release feeds declare the 30px author avatar this way. The browser also hides small images after load.
+MIN_DECLARED_MEDIA_SIDE = 64
 # Characters of text that a card shows. The cut falls between whole blocks or whole list items.
 EXCERPT_TEXT_BUDGET = 1500
 # Kept with their formatting. Only `a` keeps an attribute (`href`). `tt` becomes `code`.
@@ -218,6 +221,14 @@ def media_metadata(media: tuple[CardMedia, ...]) -> dict[str, list[dict[str, str
     return {"media": [{"url": item.url, "kind": item.kind} for item in media]} if media else {}
 
 
+def is_icon_size(width: object, height: object) -> bool:
+    """True when a declared `width` or `height`, such as an `img` attribute or a Media RSS size, is under 64px.
+
+    A value that is not a whole number, or no value, declares nothing.
+    """
+    return any(isinstance(side, str) and side.isdigit() and int(side) < MIN_DECLARED_MEDIA_SIDE for side in (width, height))
+
+
 def _image_source(attrs: dict[str, str | None]) -> str:
     """The address of an `img`. Lazy-loading pages keep it in `data-src` and put a placeholder in `src`."""
     source = attrs.get("src") or ""
@@ -240,7 +251,7 @@ def card_media(tag: str, attrs: dict[str, str | None], base_url: str | None = No
         source = _image_source(attrs)
         if "badge" in source.lower() or "emoji" in (attrs.get("class") or ""):
             return None
-        if any(size and size.isdigit() and int(size) < 64 for size in (attrs.get("width"), attrs.get("height"))):
+        if is_icon_size(attrs.get("width"), attrs.get("height")):
             return None
         return media_from_url(source, base_url=base_url) if source else None
     if tag in {"video", "source"}:

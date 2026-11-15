@@ -776,7 +776,8 @@ function Feed({ owner, profiles, revision, headerSlot, onEdit }: { owner: string
             </div>
           </section> : null}
 
-          <section data-queue="desk" className="rounded border-2 border-line bg-raised px-1 py-3 sm:p-5">
+          {/* Below md, the desk is the page itself: no frame and no title, only the cards. */}
+          <section data-queue="desk" className="px-1 md:rounded md:border-2 md:border-line md:bg-raised md:p-5">
             <QueueHeader count={deskChanges.length} icon={<Newspaper className="h-4 w-4" />} title="The desk" tone="desk">
               {isLoading ? "Load your feed..." : error ? "The feed could not load. Retry above." : sourceCount === 0 ? "Add or enable a source to fill your desk."
                 : deskChanges.length ? `${deskChanges.length} readable ${profileLabel(selectedProfile)} item${deskChanges.length === 1 ? "" : "s"} from the last ${windowLabel(feedWindow)}.`
@@ -788,7 +789,7 @@ function Feed({ owner, profiles, revision, headerSlot, onEdit }: { owner: string
             {isLoading ? (
               <LoadingState />
             ) : deskChanges.length === 0 ? null : (
-              <div className="mt-5 grid gap-4">
+              <div className="grid gap-4 md:mt-5">
                 {deskChanges.map((change) => (
                   <ChangeCard key={change.change_key} {...cardProps(change, "desk")} />
                 ))}
@@ -824,9 +825,11 @@ function Feed({ owner, profiles, revision, headerSlot, onEdit }: { owner: string
 function QueueHeader({ children, count, icon, title, tone }: { children?: ReactNode; count: number; icon: ReactNode; title: string; tone: "shelf" | "desk" }) {
   const muted = tone === "shelf" ? "text-select-fg" : "text-muted";
   const body = tone === "shelf" ? "text-select-fg" : "text-muted";
+  // Below md, the desk shows no title: its header is only the empty-desk message.
+  const display = tone === "desk" ? (count ? "hidden md:flex" : "flex py-3 md:py-0") : "flex";
   return (
-    <div className={`flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between ${count ? "border-b-2 pb-4" : ""} ${tone === "shelf" ? "border-select-fg" : "border-line"}`}>
-      <div>
+    <div className={`${display} flex-col gap-3 sm:flex-row sm:items-end sm:justify-between ${count ? "border-b-2 pb-4" : ""} ${tone === "shelf" ? "border-select-fg" : "border-line"}`}>
+      <div className={tone === "desk" ? "hidden md:block" : ""}>
         <div className={`flex items-center gap-2 text-xs font-extrabold uppercase tracking-[0.12em] ${muted}`}>
           {icon}
           {title}

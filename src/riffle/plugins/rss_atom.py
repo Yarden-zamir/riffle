@@ -4,7 +4,7 @@ import calendar
 from datetime import datetime, timezone
 from typing import Any
 
-from riffle.enrichment import PROFILES, CardMedia, enrich_change, media_from_url, media_metadata, plain_text, profile_for
+from riffle.enrichment import PROFILES, CardMedia, enrich_change, is_icon_size, media_from_url, media_metadata, plain_text, profile_for
 from riffle.feeds import fetch_feed
 from riffle.models import ChangeInput, Source, TimeWindow
 from riffle.network import (
@@ -44,7 +44,7 @@ def _entry_media(entry: Any, key: str, url_key: str, base_url: str | None) -> li
         return []
     found: list[CardMedia | None] = []
     for item in items:
-        if not hasattr(item, "get") or not isinstance(item.get(url_key), str):
+        if not hasattr(item, "get") or not isinstance(item.get(url_key), str) or is_icon_size(item.get("width"), item.get("height")):
             continue
         # Media RSS names the kind in `medium`. Enclosures and Media RSS both can carry a MIME `type`.
         hint = str(item.get("medium") or item.get("type") or "")

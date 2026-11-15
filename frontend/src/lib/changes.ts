@@ -54,6 +54,14 @@ export function renderedHtml(value: string) {
   return DOMPurify.sanitize(parsed);
 }
 
+/** An image whose longest side is under this many pixels is an icon, an avatar or a logo. The card box is wider and 192px or more tall, so it would show blown up. */
+export const MIN_CARD_IMAGE_SIDE = 240;
+
+/** True when a loaded image is too small to show on a card. */
+export function isTooSmallForCard(image: HTMLImageElement) {
+  return Math.max(image.naturalWidth, image.naturalHeight) < MIN_CARD_IMAGE_SIDE;
+}
+
 export type CardMedia = { url: string; kind: "image" | "gif" | "video"; /** The position in `metadata.media`, which the media route takes. */ index: number };
 
 /** The images, GIFs and videos of a card, from `metadata.media`. Entries with an unsafe address or an unknown kind are left out. */
