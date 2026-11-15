@@ -116,7 +116,8 @@ test("feed browser contracts", { skip: !process.env.PLAYWRIGHT_MODULE, timeout: 
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
       const readingWidth = await card(page, 1).locator('.riffle-rendered').evaluate((element) => element.getBoundingClientRect().width);
       assert.ok(readingWidth > width * 0.78, `Article text uses most of the mobile screen width: ${readingWidth}`);
-      assert.equal(await clear(card(page, 1)).count(), 0, "Swipes replace the clear button");
+      assert.ok((await clear(card(page, 1)).boundingBox()).width < 60, "Phones get a small icon clear button");
+      assert.equal(await card(page, 1).getByRole("button", { name: "Shelf", exact: true }).filter({ visible: true }).count(), 0, "Swipes replace the shelf button");
       if (process.env.SCREENSHOT_DIR) await page.screenshot({ path: `${process.env.SCREENSHOT_DIR}/compact-panel-${width}.png` });
     }
   });

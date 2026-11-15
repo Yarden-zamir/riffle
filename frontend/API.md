@@ -115,7 +115,7 @@ type PreviewChange = Pick<Change,
 >;
 ```
 
-`Change.content` can hold an HTML excerpt of the post. The client sanitizes it before it renders. `Change.metadata.media`, when present, lists `{ url, kind }` items in post order. Every source plugin can fill it, where `kind` is `image`, `gif` or `video`. The card shows them in a row that scrolls sideways, and hides an item that does not load. `GET /changes/{id}/media/{index}` returns the bytes of a GIF item, for the scrubber.
+`Change.content` can hold an HTML excerpt of the post. The client sanitizes it before it renders. `Change.metadata.media`, when present, lists `{ url, kind }` items in post order. Every source plugin can fill it, where `kind` is `image`, `gif` or `video`. The card shows them in a row that scrolls sideways, and hides an item that does not load or an image whose longest side is under 240px. `GET /changes/{id}/media/{index}` returns the bytes of a GIF item, for the scrubber.
 
 Dates use ISO strings. Required text fields use empty strings rather than `null`.
 Feed windows use `24h`, `7d`, `30d`, `90d`, or `365d`.

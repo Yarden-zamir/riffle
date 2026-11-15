@@ -226,6 +226,18 @@ body:has(dialog[open]) { overflow: hidden; }
   .editor-preview-items { max-height: 24rem; }
 }
 
+/* Below md, card text has no frame. While more text scrolls below, the bottom fades out.
+   A box that does not scroll has no active scroll timeline, so it gets no fade. */
+@property --preview-fade { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@keyframes preview-fade { from, 85% { --preview-fade: 3rem; } to { --preview-fade: 0px; } }
+@media (max-width: 767px) {
+  .card-preview {
+    mask-image: linear-gradient(to bottom, #000 calc(100% - var(--preview-fade)), transparent);
+    animation: preview-fade linear both;
+    animation-timeline: scroll(self);
+  }
+}
+
 .riffle-rendered { overflow-wrap: anywhere; }
 .riffle-rendered img { max-width: 100%; height: auto; }
 

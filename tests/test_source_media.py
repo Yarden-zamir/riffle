@@ -8,6 +8,7 @@ from test_source_preview import source, window as window  # noqa: F401
 
 from riffle.enrichment import enrich_change, enrichment_profile, media_from_url, page_media
 from riffle.plugins.news_sitemap import NewsSitemapPlugin
+from riffle.plugins.rss_atom import RssAtomPlugin
 from riffle.plugins.x import XPlugin
 
 PROFILE = enrichment_profile("plain")
@@ -43,6 +44,22 @@ def test_feed_media_follow_the_body_and_thumbnails_only_fill_an_empty_card() -> 
     ]
     assert media(enrich("<p>No pictures</p>", thumbnails=thumb).media) == [("https://cdn.example/thumb.jpg", "image")]
 
+
+def test_feed_media_with_an_icon_size_do_not_count(wire, window) -> None:
+    # GitHub release feeds attach the author avatar as a 30px thumbnail.
+    body = b"""<feed xmlns='http://www.w3.org/2005/Atom' xmlns:media='http://search.yahoo.com/mrss/'><title>Releases</title>
+    <entry><id>avatar</id><title>v1</title><updated>2026-07-02T00:00:00Z</updated><content type='html'>&lt;p&gt;Notes&lt;/p&gt;</content>
+    <media:thumbnail height='30' width='30' url='https://avatars.githubusercontent.com/u/1?s=60'/></entry>
+    <entry><id>photo</id><title>v2</title><updated>2026-07-02T00:00:00Z</updated><content type='html'>&lt;p&gt;Notes&lt;/p&gt;</content>
+    <media:thumbnail height='630' width='1200' url='https://cdn.example/share.png'/></entry></feed>"""
+    wire.responses.append(response(body))
+
+    changes = RssAtomPlugin().fetch(source(), window)
+
+    assert {change.external_id: change.metadata.get("media") for change in changes} == {
+        "avatar": None,
+        "photo": [{"url": "https://cdn.example/share.png", "kind": "image"}],
+    }
 
 def test_a_fetched_linked_page_gives_its_share_image_to_a_card_without_media() -> None:
     page = '<html><head><meta property="og:image" content="/share.png"></head><body><p>Full article text.</p></body></html>'

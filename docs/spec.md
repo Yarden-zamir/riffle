@@ -265,12 +265,12 @@ Behavior:
 - The card `content` of an entry with an HTML body is an excerpt of that body. It keeps headings, lists, bold, links, code and tables. It drops images, scripts and `<details>` blocks.
 - The excerpt shows about 1,500 characters of text. It cuts between whole blocks or whole list items, and it ends with `…` after a cut.
 - A body from a fetched linked page gets no excerpt. Its card shows the compacted summary.
-- `metadata.media` lists the images, GIFs and videos of the entry body for the card, in post order, without repeats, and at most 12. Each entry has `url` and `kind` (`image`, `gif` or `video`). Icons, badges, emoji and SVG files do not count. A signed GitHub attachment link becomes its lasting `github.com/user-attachments/assets/<id>` address, because the signed link expires after 300 seconds.
+- `metadata.media` lists the images, GIFs and videos of the entry body for the card, in post order, without repeats, and at most 12. Each entry has `url` and `kind` (`image`, `gif` or `video`). Icons, badges, emoji and SVG files do not count. An image or feed media item with a declared width or height under 64px does not count, such as the 30px author avatar of a GitHub release feed. A signed GitHub attachment link becomes its lasting `github.com/user-attachments/assets/<id>` address, because the signed link expires after 300 seconds.
 - Body images also count when their address is relative or lazy-loaded (`data-src`, `srcset`). A relative address resolves against the entry link.
 - Media that the feed attaches (`media:content` and image or video enclosures) follow the body media. A `media:thumbnail`, or the share image of a fetched linked page, shows only when the entry has no other media.
 - HTML news cards take the Open Graph or Twitter card image or video of the article. X cards take the photos of the post, and the best MP4 of a video or GIF. News sitemap cards take the image sitemap pictures of the article.
 - A video comes from a `<video>` or `<source>` tag, or from a link to an `.mp4`, `.webm`, `.mov` or `.m4v` file. A GIF is an image whose file ends in `.gif`, also behind a camo address.
-- A card shows its media in a row that scrolls sideways. A click opens a full-screen viewer: zoom with buttons, the mouse wheel, a pinch or a double click, drag to pan, and move between items with the arrow buttons or keys. The viewer links to the original.
+- A card shows its media in a row that scrolls sideways. It hides an item that does not load, and an image whose longest side is under 240px, because that is an icon, an avatar or a logo. A click opens a full-screen viewer: zoom with buttons, the mouse wheel, a pinch or a double click, drag to pan, and move between items with the arrow buttons or keys. The viewer links to the original.
 - In the viewer, a video or a GIF has a play button and a scrubber. Space plays or pauses, and `,` and `.` step back and forward. A GIF scrubber decodes the frames in the browser (`ImageDecoder`). Without `ImageDecoder`, the GIF plays without a scrubber.
 - `GET /changes/{id}/media/{index}` returns the bytes of a GIF from `metadata.media` of a card of the requesting owner, up to 25 MB. It refuses other kinds and other owners, so it is no open proxy. Image hosts such as camo send no CORS headers, so the browser cannot read GIF bytes from them directly.
 - Common boilerplate such as changelog compare links, release dates, download lists, social links, and feed footer text is dropped when detected.
@@ -452,7 +452,7 @@ Behavior:
 - At animation completion the queue updates optimistically, without waiting for the server. Other cards remain usable while writes finish serially in the background.
 - Failed writes restore the failed and unsent optimistic changes, cancel unsent jobs, and require an explicit reload. Acknowledged changes remain saved. Undo waits until queued writes finish.
 - Desktop cards place Clear or Mark read at the top right, independent of content height. Mobile cards keep a bottom action bar.
-- Below the medium breakpoint, cards show no Clear, Mark read, or Shelf button, because swipes do those actions.
+- Below the medium breakpoint, cards show no Shelf button, because a swipe shelves. A small icon button next to the note button clears the card, or marks it read on the shelf.
 - Open source is an icon button at all sizes.
 - When a card leaves a queue, the card after it takes its place in the viewport. Shelving does not move the viewport even though the shelf above grows.
 - Keyboard: `j`/`k` or arrow keys move the current card, `x` clears or marks read, `s` shelves or unshelves, `o` or Enter opens the source, `n` toggles the note, `z` undoes. Keys are ignored while typing.
@@ -466,6 +466,7 @@ Behavior:
 - Without a source filter, Restore covers loaded dismissed entries across the profile. It preserves notes and shelf flags; it never restores unloaded entries.
 - The note control is an arrow that expands a text box on the card. Saving a note from the desk shelves the entry. Cmd/Ctrl+Enter saves, Escape closes.
 - An empty shelf is hidden. An empty desk uses a one-line message in its header, without a duplicate panel.
+- Below the medium breakpoint, the desk has no frame and no title: its cards follow each other on the page. The empty-desk message still shows. Card text and media have no frame and the media row runs to the card edges. While more card text scrolls, its bottom fades out.
 - The desk header distinguishes feed load in progress, load error, no active sources, items on the shelf, cleared items, and no unread items.
 - Empty-desk guidance points to source management, restore, or the existing Window control as appropriate. Account setup remains separate.
 - Below the large breakpoint, two buttons left of the GitHub menu replace the control panel. The first shows the desk count and opens all counts. The second opens the profile, window, and order controls.
